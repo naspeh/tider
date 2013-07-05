@@ -5,14 +5,24 @@ from collections import namedtuple
 import cairo as C
 from gi.repository import Gtk, GObject
 
-Context = namedtuple('Context', 'conf var win tray menu')
+Context = namedtuple('Context', 'conf start win tray menu')
 Config = namedtuple('Config', 'app_dir timeout')
+
+
+class Variable:
+    __slots__ = ('value', )
+
+    def __init__(self, value=None):
+        self.value = value
+
+    def __repr__(self):
+        return 'Variable({!r})'.format(self.value)
 
 
 def wavelog():
     g = Context(
         conf=Config(timeout=1000, app_dir='./var/'),
-        var={'start': None},
+        start=Variable(),
         win=create_win(),
         menu=create_menu(),
         tray=create_icon(),
@@ -87,10 +97,10 @@ def create_icon():
 
 
 def update_icon(g):
-    if g.var['start']:
-        duration = int(time.time() - g.var['start'])
+    if g.start.value:
+        duration = int(time.time() - g.start.value)
     else:
-        g.var['start'] = time.time()
+        g.start.value = time.time()
         duration = 0
 
     max_w = 90
