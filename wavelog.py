@@ -85,7 +85,7 @@ def update_icon(g):
     if g.var['start']:
         duration = int(time.time() - g.var['start'])
     else:
-        g.var['start']=time.time()
+        g.var['start'] = time.time()
         duration = 0
 
     if duration > 10:
