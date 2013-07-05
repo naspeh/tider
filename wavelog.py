@@ -37,7 +37,12 @@ def create_win():
     vbox = Gtk.VBox()
     vbox.pack_start(img, False, True, 1)
 
-    win = Gtk.Window()
+    win = Gtk.Window(
+        title='Wavelog', resizable=False, decorated=False,
+        skip_pager_hint=True, skip_taskbar_hint=True
+    )
+    win.set_keep_above(True)
+    win.move(960, 0)
     win.add(vbox)
     win.show_all()
     win.img = img
@@ -87,10 +92,6 @@ def update_icon(g):
     else:
         g.var['start'] = time.time()
         duration = 0
-
-    if duration > 10:
-        Gtk.main_quit()
-        return
 
     max_w = 90
     max_h = 30
