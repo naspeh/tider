@@ -10,18 +10,34 @@ DIR = os.path.abspath(os.path.dirname(__file__) + '/var') + '/'
 
 class Wavelog():
     def __init__(self):
-        self.tray = Gtk.StatusIcon()
         self.start = None
-        self.timeout = 1
+        self.timeout = 1000
         self.width = 20
         self.height = 20
 
-        #self.connect('activate', lambda x: Gtk.main_quit())
+        win = self.create_win()
         menu = self.create_menu()
-        self.tray.connect('popup-menu', self.show_menu, menu)
+        tray = self.create_icon()
 
-        self.create_icon()
-        GObject.timeout_add_seconds(self.timeout, self.update_icon)
+        tray.connect('activate', self.toggle_win, win)
+        tray.connect('popup-menu', self.show_menu, menu)
+        GObject.timeout_add(self.timeout, self.update_icon, tray)
+
+    def toggle_win(self, widget, win):
+        if win.is_visible():
+            win.hide()
+        else:
+            win.show_all()
+
+    def create_win(self):
+        window = Gtk.Window()
+        window.connect('destroy', lambda wid: Gtk.main_quit())
+        label = Gtk.Label('Periodic Timer')
+        vbox = Gtk.VBox()
+        vbox.pack_start(label, True, True, 0)
+        window.add(vbox)
+        window.show_all()
+        return window
 
     def create_menu(self):
         about = Gtk.ImageMenuItem.new_from_stock(Gtk.STOCK_ABOUT, None)
@@ -49,11 +65,12 @@ class Wavelog():
         about.run()
         about.destroy()
 
-    def update_icon(self):
-        self.create_icon()
-        return True
-
     def create_icon(self):
+        tray = Gtk.StatusIcon()
+        self.update_icon(tray)
+        return tray
+
+    def update_icon(self, tray):
         if self.start:
             duration = int(time.time() - self.start)
         else:
@@ -99,7 +116,9 @@ class Wavelog():
         #ctx.stroke()
 
         img.write_to_png(icon_path)
-        self.tray.set_from_file(icon_path)
+        tray.set_from_file(icon_path)
+        return True
+
 
 
 if __name__ == '__main__':
