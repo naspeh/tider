@@ -15,13 +15,15 @@ class Wavelog():
         self.width = 20
         self.height = 20
 
-        win = self.create_win()
+        win, img = self.create_win()
         menu = self.create_menu()
         tray = self.create_icon()
 
+        self.update_icon(tray, img)
+
         tray.connect('activate', self.toggle_win, win)
         tray.connect('popup-menu', self.show_menu, menu)
-        GObject.timeout_add(self.timeout, self.update_icon, tray)
+        GObject.timeout_add(self.timeout, self.update_icon, tray, img)
 
     def toggle_win(self, widget, win):
         if win.is_visible():
@@ -30,14 +32,16 @@ class Wavelog():
             win.show_all()
 
     def create_win(self):
-        window = Gtk.Window()
-        window.connect('destroy', lambda wid: Gtk.main_quit())
-        label = Gtk.Label('Periodic Timer')
+        img = Gtk.Image()
         vbox = Gtk.VBox()
-        vbox.pack_start(label, True, True, 0)
+        vbox.pack_start(img, True, True, 0)
+
+        window = Gtk.Window()
         window.add(vbox)
         window.show_all()
-        return window
+
+        window.connect('destroy', lambda wid: Gtk.main_quit())
+        return window, img
 
     def create_menu(self):
         about = Gtk.ImageMenuItem.new_from_stock(Gtk.STOCK_ABOUT, None)
@@ -67,10 +71,9 @@ class Wavelog():
 
     def create_icon(self):
         tray = Gtk.StatusIcon()
-        self.update_icon(tray)
         return tray
 
-    def update_icon(self, tray):
+    def update_icon(self, tray, img):
         if self.start:
             duration = int(time.time() - self.start)
         else:
@@ -82,8 +85,8 @@ class Wavelog():
             return
 
         icon_path = DIR + 'example.png'
-        img = C.ImageSurface(C.FORMAT_ARGB32, self.width, self.height)
-        ctx = C.Context(img)
+        src = C.ImageSurface(C.FORMAT_ARGB32, self.width, self.height)
+        ctx = C.Context(src)
 
         padding = 2
         height = self.width - padding
@@ -115,8 +118,9 @@ class Wavelog():
         #ctx.line_to(padding / 2 + w * duration, height)
         #ctx.stroke()
 
-        img.write_to_png(icon_path)
+        src.write_to_png(icon_path)
         tray.set_from_file(icon_path)
+        img.set_from_file(icon_path)
         return True
 
 
