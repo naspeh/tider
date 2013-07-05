@@ -103,15 +103,15 @@ def update_icon(g):
         g.start.value = time.time()
         duration = 0
 
-    max_w = 90
-    max_h = 30
-    padding = max_h / 5
-    box_h = max_h - padding
-    box_w = max_w - padding
-    font_h = box_h - padding
+    max_w = 60
+    max_h = 20
+    padding = max_h / 8
+    box_h = max_h - 2 * padding
+    box_w = max_w - 2 * padding
+    font_h = box_h - padding * 1.5
     font_rgb = (0, 0, 0)
-    timer_w = box_w / 3 + padding
-    work_rgb = (0.25, 0.7, 0.4)
+    timer_w = box_w * 0.4 + padding
+    work_rgb = (0.6, 0.9, 0.6)
 
     icon_path = g.conf.app_dir + 'example.png'
     src = C.ImageSurface(C.FORMAT_ARGB32, max_w, max_h)
@@ -127,16 +127,16 @@ def update_icon(g):
     ctx.fill()
 
     ctx.set_source_rgb(*font_rgb)
-    #ctx.select_font_face('Sans', C.FONT_SLANT_NORMAL, C.FONT_WEIGHT_BOLD)
+    #ctx.select_font_face('Mono', C.FONT_SLANT_NORMAL, C.FONT_WEIGHT_BOLD)
     ctx.set_font_size(font_h)
 
     text = str(duration)
     text_w, text_h = ctx.text_extents(text)[2:4]
-    ctx.move_to(timer_w - text_w - padding, text_h + padding)
+    ctx.move_to(timer_w - text_w - padding, text_h + 2 * padding)
     ctx.show_text(text)
 
-    text = 'prog'
-    ctx.move_to(timer_w + padding, text_h + padding)
+    text = 'break'
+    ctx.move_to(timer_w + padding, text_h + 2 * padding)
     ctx.show_text(text)
 
     #ctx.set_line_width(12)
