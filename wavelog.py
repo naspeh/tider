@@ -10,14 +10,14 @@ DIR = os.path.abspath(os.path.dirname(__file__) + '/var') + '/'
 
 class Wavelog(Gtk.StatusIcon):
     def __init__(self):
-        super().__init__()
+        self.tray = Gtk.StatusIcon()
         self.start = None
         self.timeout = 1
         self.width = 20
         self.height = 20
 
         #self.connect('activate', lambda x: Gtk.main_quit())
-        self.connect('popup-menu', self.make_menu)
+        self.tray.connect('popup-menu', self.make_menu)
         GObject.timeout_add_seconds(self.timeout, self.update_icon)
         self.create_icon()
 
@@ -33,7 +33,7 @@ class Wavelog(Gtk.StatusIcon):
         menu.append(Gtk.SeparatorMenuItem())
         menu.append(quit)
         menu.show_all()
-        menu.popup(None, None, self.position_menu, icon, e_button, e_time)
+        menu.popup(None, None, self.position_menu, None, e_button, e_time)
 
     def show_about(self, widget):
         about = Gtk.AboutDialog()
@@ -89,14 +89,12 @@ class Wavelog(Gtk.StatusIcon):
         #ctx.set_line_width(12)
         #ctx.set_source_rgb(0, 0, 0.7)
         #w = width / 10
-        #ctx.rectangle(padding / 2, 10, padding / 2 + duration * w, self.height)
-        ##ctx.move_to(padding / 2, height)
-        ##ctx.line_to(padding / 2 + w * duration, height)
-        ##ctx.stroke()
-        #ctx.fill()
+        #ctx.move_to(padding / 2, height)
+        #ctx.line_to(padding / 2 + w * duration, height)
+        #ctx.stroke()
 
         img.write_to_png(icon_path)
-        self.set_from_file(icon_path)
+        self.tray.set_from_file(icon_path)
 
 
 if __name__ == '__main__':
