@@ -8,7 +8,7 @@ from gi.repository import Gtk, GObject
 DIR = os.path.abspath(os.path.dirname(__file__) + '/var') + '/'
 
 
-class Wavelog(Gtk.StatusIcon):
+class Wavelog():
     def __init__(self):
         self.tray = Gtk.StatusIcon()
         self.start = None
@@ -17,11 +17,13 @@ class Wavelog(Gtk.StatusIcon):
         self.height = 20
 
         #self.connect('activate', lambda x: Gtk.main_quit())
-        self.tray.connect('popup-menu', self.make_menu)
-        GObject.timeout_add_seconds(self.timeout, self.update_icon)
-        self.create_icon()
+        menu = self.create_menu()
+        self.tray.connect('popup-menu', self.show_menu, menu)
 
-    def make_menu(self, icon, e_button, e_time):
+        self.create_icon()
+        GObject.timeout_add_seconds(self.timeout, self.update_icon)
+
+    def create_menu(self):
         about = Gtk.ImageMenuItem.new_from_stock(Gtk.STOCK_ABOUT, None)
         about.connect('activate', self.show_about)
 
@@ -32,8 +34,11 @@ class Wavelog(Gtk.StatusIcon):
         menu.append(about)
         menu.append(Gtk.SeparatorMenuItem())
         menu.append(quit)
+        return menu
+
+    def show_menu(self, icon, e_button, e_time, menu):
         menu.show_all()
-        menu.popup(None, None, self.position_menu, None, e_button, e_time)
+        menu.popup(None, None, icon.position_menu, icon, e_button, e_time)
 
     def show_about(self, widget):
         about = Gtk.AboutDialog()
