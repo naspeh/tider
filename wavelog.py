@@ -1,11 +1,12 @@
 #!/usr/bin/env python
+import sqlite3
 import time
 from collections import namedtuple
 
 import cairo as C
 from gi.repository import Gtk, GObject
 
-Context = namedtuple('Context', 'conf start active target win tray menu')
+Context = namedtuple('Context', 'conf db start active target win tray menu')
 Config = namedtuple('Config', 'app_dir timeout')
 
 
@@ -20,8 +21,10 @@ class Variable:
 
 
 def wavelog():
+    conf = Config(timeout=500, app_dir='./var/')
     g = Context(
-        conf=Config(timeout=500, app_dir='./var/'),
+        conf=conf,
+        db=connect_db(conf),
         start=Variable(),
         active=Variable(False),
         target=Variable(''),
@@ -29,14 +32,16 @@ def wavelog():
         menu=create_menu(),
         tray=create_icon(),
     )
-
+    g.win.connect('destroy', lambda x: main_quit(g))
+    g.win.connect('delete_event', lambda x, y: main_quit(g))
+    g.menu.quit.connect('activate', lambda x: main_quit(g))
     g.menu.start.connect('activate', toggle_target, True, g)
     g.menu.stop.connect('activate', toggle_target, False, g)
     g.tray.connect('activate', toggle_win, g.win)
     g.tray.connect('popup-menu', show_menu, g.menu)
     GObject.timeout_add(g.conf.timeout, update_img, g)
 
-    toggle_target(g.menu.stop, False, g)
+    toggle_target(g.menu.stop, False, g, init=True)
     update_img(g)
 
 
@@ -78,7 +83,6 @@ def create_menu():
     about.show()
 
     quit = Gtk.ImageMenuItem.new_from_stock(Gtk.STOCK_QUIT, None)
-    quit.connect('activate', Gtk.main_quit)
     quit.show()
 
     menu = Gtk.Menu()
@@ -89,10 +93,20 @@ def create_menu():
     menu.append(quit)
     menu.start = start
     menu.stop = stop
+    menu.quit = quit
     return menu
 
 
-def toggle_target(widget, flag, g):
+def main_quit(g):
+    save_log(g)
+    Gtk.main_quit()
+
+
+def toggle_target(widget, flag, g, init=False):
+    if not init:
+        save_log(g)
+        g.start.value = time.time()
+
     if flag:
         g.menu.start.hide()
         g.menu.stop.show()
@@ -146,7 +160,7 @@ def update_img(g):
     timer_w = box_w * 0.4 + padding
     color = (0.6, 0.9, 0.6) if g.active.value else (0.7, 0.7, 0.7)
 
-    icon_path = g.conf.app_dir + 'example.png'
+    icon_path = g.conf.app_dir + 'wavelog.png'
     src = C.ImageSurface(C.FORMAT_ARGB32, max_w, max_h)
     ctx = C.Context(src)
 
@@ -185,6 +199,51 @@ def update_img(g):
     #tray.set_from_file(icon_path)
     g.win.img.set_from_file(icon_path)
     return True
+
+
+def connect_db(conf):
+    db_path = conf.app_dir + 'wavelog.db'
+    db = sqlite3.connect(db_path)
+    cur = db.cursor()
+    cur.execute(
+        'SELECT name FROM sqlite_master WHERE type="table" AND name="log"'
+    )
+    if not cur.fetchone():
+        cur.execute(
+            '''
+            CREATE TABLE `log`(
+                `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                `target` varchar(255) NOT NULL,
+                `started` TEXT,
+                `ended` TEXT,
+                `duration` REAL,
+                `is_active` INTEGER,
+                UNIQUE (target, started)
+            )
+            '''
+        )
+        db.commit()
+    return db
+
+
+def save_log(g):
+    cur = g.db.cursor()
+    target = g.target.value
+    duration = time.time() - g.start.value
+    started = time.strftime('%Y-%m-%d %H:%M:%S', time.gmtime(g.start.value))
+    ended = time.strftime('%Y-%m-%d %H:%M:%S', time.gmtime())
+    is_active = 1 if g.active.value else 0
+    cur.execute(
+        'SELECT id FROM log WHERE started = ? AND target = ?',
+        [started, target]
+    )
+    if not cur.fetchone():
+        cur.execute(
+            'INSERT INTO log (target, started, ended,  duration, is_active) '
+            '   VALUES (?, ?, ?, ?, ?)',
+            [target, started, ended,  duration, is_active]
+        )
+        g.db.commit()
 
 
 if __name__ == '__main__':
