@@ -78,6 +78,9 @@ def create_menu():
     stop = Gtk.ImageMenuItem.new_from_stock(Gtk.STOCK_NO, None)
     stop.set_label('Stop working')
 
+    separator = Gtk.SeparatorMenuItem()
+    separator.show()
+
     about = Gtk.ImageMenuItem.new_from_stock(Gtk.STOCK_ABOUT, None)
     about.connect('activate', show_about)
     about.show()
@@ -88,8 +91,8 @@ def create_menu():
     menu = Gtk.Menu()
     menu.append(start)
     menu.append(stop)
+    menu.append(separator)
     menu.append(about)
-    menu.append(Gtk.SeparatorMenuItem())
     menu.append(quit)
     menu.start = start
     menu.stop = stop
