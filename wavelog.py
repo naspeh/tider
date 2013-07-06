@@ -27,22 +27,25 @@ def wavelog():
         db=connect_db(conf),
         start=Variable(),
         active=Variable(False),
-        target=Variable(''),
+        target=Variable('OFF'),
         win=create_win(),
         menu=create_menu(),
         tray=create_icon(),
     )
+
     g.win.connect('destroy', lambda x: main_quit(g))
     g.win.connect('delete_event', lambda x, y: main_quit(g))
-    g.menu.quit.connect('activate', lambda x: main_quit(g))
-    g.menu.start.connect('activate', toggle_target, True, g)
-    g.menu.stop.connect('activate', toggle_target, False, g)
+    g.menu.child_quit.connect('activate', lambda x: main_quit(g))
+    g.menu.child_start.connect('activate', lambda x: toggle_active(g, True))
+    g.menu.child_stop.connect('activate', lambda x: toggle_active(g, False))
+    g.menu.child_target.connect('activate', change_target, g)
     g.tray.connect('activate', toggle_win, g.win)
     g.tray.connect('popup-menu', show_menu, g.menu)
-    GObject.timeout_add(g.conf.timeout, update_img, g)
+    GObject.timeout_add(
+        g.conf.timeout, lambda: g.start.value is None or update_ui(g)
+    )
 
-    toggle_target(g.menu.stop, False, g, init=True)
-    update_img(g)
+    update_ui(g)
 
 
 def toggle_win(widget, win):
@@ -52,76 +55,40 @@ def toggle_win(widget, win):
         win.show_all()
 
 
-def create_win():
-    img = Gtk.Image()
-    vbox = Gtk.VBox()
-    vbox.pack_start(img, False, True, 1)
-
-    win = Gtk.Window(
-        title='Wavelog', resizable=False, decorated=False,
-        skip_pager_hint=True, skip_taskbar_hint=True
-    )
-    win.set_keep_above(True)
-    win.move(960, 0)
-    win.add(vbox)
-    win.show_all()
-    win.img = img
-
-    win.connect('destroy', lambda wid: Gtk.main_quit())
-    return win
-
-
-def create_menu():
-    start = Gtk.ImageMenuItem.new_from_stock(Gtk.STOCK_YES, None)
-    start.set_label('Start working')
-
-    stop = Gtk.ImageMenuItem.new_from_stock(Gtk.STOCK_NO, None)
-    stop.set_label('Stop working')
-
-    separator = Gtk.SeparatorMenuItem()
-    separator.show()
-
-    about = Gtk.ImageMenuItem.new_from_stock(Gtk.STOCK_ABOUT, None)
-    about.connect('activate', show_about)
-    about.show()
-
-    quit = Gtk.ImageMenuItem.new_from_stock(Gtk.STOCK_QUIT, None)
-    quit.show()
-
-    menu = Gtk.Menu()
-    menu.append(start)
-    menu.append(stop)
-    menu.append(separator)
-    menu.append(about)
-    menu.append(quit)
-    menu.start = start
-    menu.stop = stop
-    menu.quit = quit
-    return menu
-
-
 def main_quit(g):
     save_log(g)
     Gtk.main_quit()
 
 
-def toggle_target(widget, flag, g, init=False):
-    if not init:
+def toggle_active(g, flag=True, target=None):
+    if g.start.value:
         save_log(g)
-        g.start.value = time.time()
+    if target:
+        g.target.value = target
 
-    if flag:
-        g.menu.start.hide()
-        g.menu.stop.show()
-        g.tray.set_from_stock(Gtk.STOCK_YES)
-        g.active.value = True
-        g.target.value = 'work'
-    else:
-        g.menu.stop.hide()
-        g.menu.start.show()
-        g.tray.set_from_stock(Gtk.STOCK_NO)
-        g.active.value = False
-        g.target.value = 'break'
+    g.start.value = time.time()
+    g.active.value = flag
+
+    update_ui(g)
+
+
+def change_target(widget, g):
+    dialog = Gtk.Dialog('Enter target')
+    box = dialog.get_content_area()
+    entry = Gtk.Entry()
+    entry.set_text(g.target.value)
+    box.add(entry)
+    dialog.add_buttons(
+        Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL,
+        Gtk.STOCK_OK, Gtk.ResponseType.OK
+    )
+    dialog.show_all()
+
+    response = dialog.run()
+    if response == Gtk.ResponseType.OK:
+        toggle_active(g, target=entry.get_text())
+
+    dialog.destroy()
 
 
 def show_menu(icon, e_button, e_time, menu):
@@ -143,15 +110,74 @@ def create_icon():
     return tray
 
 
-def update_img(g):
+def create_win():
+    img = Gtk.Image()
+    vbox = Gtk.VBox()
+    vbox.pack_start(img, False, True, 1)
+
+    win = Gtk.Window(
+        title='Wavelog', resizable=False, decorated=False,
+        skip_pager_hint=True, skip_taskbar_hint=True
+    )
+    win.set_keep_above(True)
+    win.move(960, 0)
+    win.add(vbox)
+    win.show_all()
+    win.img = img
+    return win
+
+
+def create_menu():
+    start = Gtk.ImageMenuItem.new_from_stock(Gtk.STOCK_YES, None)
+    start.set_label('Start working')
+
+    stop = Gtk.ImageMenuItem.new_from_stock(Gtk.STOCK_NO, None)
+    stop.set_label('Stop working')
+
+    target = Gtk.ImageMenuItem.new_from_stock(Gtk.STOCK_OK, None)
+    target.set_label('Change target')
+    target.show()
+
+    separator = Gtk.SeparatorMenuItem()
+    separator.show()
+
+    about = Gtk.ImageMenuItem.new_from_stock(Gtk.STOCK_ABOUT, None)
+    about.connect('activate', show_about)
+    about.show()
+
+    quit = Gtk.ImageMenuItem.new_from_stock(Gtk.STOCK_QUIT, None)
+    quit.show()
+
+    menu = Gtk.Menu()
+    menu.append(start)
+    menu.append(stop)
+    menu.append(target)
+    menu.append(separator)
+    menu.append(about)
+    menu.append(quit)
+
+    menu.child_start = start
+    menu.child_stop = stop
+    menu.child_target = target
+    menu.child_quit = quit
+    return menu
+
+
+def update_ui(g):
     duration = {'total': 0}
     if g.start.value:
         duration['total'] = int(time.time() - g.start.value)
-    else:
-        g.start.value = time.time()
-
     duration['min'] = int(duration['total'] / 60)
     duration['sec'] = duration['total'] - duration['min'] * 60
+
+    if g.active.value:
+        g.menu.child_start.hide()
+        g.menu.child_stop.show()
+        g.tray.set_from_stock(Gtk.STOCK_YES)
+    else:
+        g.menu.child_stop.hide()
+        g.menu.child_start.show()
+        g.tray.set_from_stock(Gtk.STOCK_NO)
 
     max_w = 60
     max_h = 20
@@ -230,6 +256,9 @@ def connect_db(conf):
 
 
 def save_log(g):
+    if g.start.value is None:
+        return
+
     cur = g.db.cursor()
     target = g.target.value
     duration = time.time() - g.start.value
