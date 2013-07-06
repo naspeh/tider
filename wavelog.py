@@ -28,11 +28,11 @@ def wavelog():
         tray=create_icon(),
     )
 
-    update_icon(g)
+    update_img(g)
 
     g.tray.connect('activate', toggle_win, g.win)
     g.tray.connect('popup-menu', show_menu, g.menu)
-    GObject.timeout_add(g.conf.timeout, update_icon, g)
+    GObject.timeout_add(g.conf.timeout, update_img, g)
 
 
 def toggle_win(widget, win):
@@ -96,12 +96,15 @@ def create_icon():
     return tray
 
 
-def update_icon(g):
+def update_img(g):
+    duration = {'total': 0}
     if g.start.value:
-        duration = int(time.time() - g.start.value)
+        duration['total'] = int(time.time() - g.start.value)
     else:
         g.start.value = time.time()
-        duration = 0
+
+    duration['min'] = int(duration['total'] / 60)
+    duration['sec'] = duration['total'] - duration['min'] * 60
 
     max_w = 60
     max_h = 20
@@ -130,7 +133,7 @@ def update_icon(g):
     #ctx.select_font_face('Mono', C.FONT_SLANT_NORMAL, C.FONT_WEIGHT_BOLD)
     ctx.set_font_size(font_h)
 
-    text = str(duration)
+    text = str(duration['min'])
     text_w, text_h = ctx.text_extents(text)[2:4]
     ctx.move_to(timer_w - text_w - padding, text_h + 2 * padding)
     ctx.show_text(text)
@@ -139,12 +142,15 @@ def update_icon(g):
     ctx.move_to(timer_w + padding, text_h + 2 * padding)
     ctx.show_text(text)
 
-    #ctx.set_line_width(12)
-    #ctx.set_source_rgb(0, 0, 0.7)
-    #w = box_w / 10
-    #ctx.move_to(padding / 2, box_h)
-    #ctx.line_to(padding / 2 + w * duration, box_h)
-    #ctx.stroke()
+    line_h = 3
+    step_sec = 2
+    step_w = timer_w * step_sec / 60
+    duration_w = int(duration['sec'] / step_sec) * step_w
+    ctx.set_line_width(line_h)
+    ctx.set_source_rgb(0, 0, 0.7)
+    ctx.move_to(timer_w, max_h - line_h / 2)
+    ctx.line_to(timer_w - duration_w, max_h - line_h / 2)
+    ctx.stroke()
 
     src.write_to_png(icon_path)
     #tray.set_from_file(icon_path)
