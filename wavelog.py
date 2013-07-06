@@ -30,21 +30,40 @@ def wavelog():
         target=Variable('OFF'),
         win=create_win(),
         menu=create_menu(),
-        tray=create_icon(),
+        tray=Gtk.StatusIcon(),
     )
 
     g.win.connect('destroy', lambda x: main_quit(g))
     g.win.connect('delete_event', lambda x, y: main_quit(g))
+
     g.menu.child_quit.connect('activate', lambda x: main_quit(g))
+    g.menu.child_off.connect('activate', disable, g)
     g.menu.child_start.connect('activate', lambda x: toggle_active(g, True))
     g.menu.child_stop.connect('activate', lambda x: toggle_active(g, False))
     g.menu.child_target.connect('activate', change_target, g)
+
     g.tray.connect('activate', toggle_win, g.win)
-    g.tray.connect('popup-menu', show_menu, g.menu)
+    g.tray.connect(
+        'popup-menu',
+        lambda icon, button, time: (
+            g.menu.popup(None, None, icon.position_menu, icon, button, time)
+        )
+    )
     GObject.timeout_add(
         g.conf.timeout, lambda: g.start.value is None or update_ui(g)
     )
 
+    update_ui(g)
+
+
+def main_quit(g):
+    save_log(g)
+    Gtk.main_quit()
+
+
+def disable(widget, g):
+    save_log(g)
+    g.start.value = None
     update_ui(g)
 
 
@@ -53,11 +72,6 @@ def toggle_win(widget, win):
         win.hide()
     else:
         win.show_all()
-
-
-def main_quit(g):
-    save_log(g)
-    Gtk.main_quit()
 
 
 def toggle_active(g, flag=True, target=None):
@@ -91,10 +105,6 @@ def change_target(widget, g):
     dialog.destroy()
 
 
-def show_menu(icon, e_button, e_time, menu):
-    menu.popup(None, None, icon.position_menu, icon, e_button, e_time)
-
-
 def show_about(widget):
     about = Gtk.AboutDialog()
     about.set_destroy_with_parent(True)
@@ -103,11 +113,6 @@ def show_about(widget):
     about.set_version('alfa')
     about.run()
     about.destroy()
-
-
-def create_icon():
-    tray = Gtk.StatusIcon()
-    return tray
 
 
 def create_win():
@@ -128,11 +133,14 @@ def create_win():
 
 
 def create_menu():
-    start = Gtk.ImageMenuItem.new_from_stock(Gtk.STOCK_YES, None)
+    start = Gtk.ImageMenuItem.new_from_stock(Gtk.STOCK_MEDIA_PLAY, None)
     start.set_label('Start working')
 
-    stop = Gtk.ImageMenuItem.new_from_stock(Gtk.STOCK_NO, None)
+    stop = Gtk.ImageMenuItem.new_from_stock(Gtk.STOCK_MEDIA_PAUSE, None)
     stop.set_label('Stop working')
+
+    off = Gtk.ImageMenuItem.new_from_stock(Gtk.STOCK_MEDIA_STOP, None)
+    off.set_label('OFF')
 
     target = Gtk.ImageMenuItem.new_from_stock(Gtk.STOCK_OK, None)
     target.set_label('Change target')
@@ -149,15 +157,17 @@ def create_menu():
     quit.show()
 
     menu = Gtk.Menu()
+    menu.append(target)
     menu.append(start)
     menu.append(stop)
-    menu.append(target)
+    menu.append(off)
     menu.append(separator)
     menu.append(about)
     menu.append(quit)
 
     menu.child_start = start
     menu.child_stop = stop
+    menu.child_off = off
     menu.child_target = target
     menu.child_quit = quit
     return menu
@@ -170,14 +180,21 @@ def update_ui(g):
     duration['min'] = int(duration['total'] / 60)
     duration['sec'] = duration['total'] - duration['min'] * 60
 
-    if g.active.value:
+    if g.start.value is None:
+        g.menu.child_off.hide()
+        g.menu.child_start.hide()
+        g.menu.child_stop.hide()
+        g.tray.set_from_stock(Gtk.STOCK_MEDIA_STOP)
+    elif g.active.value:
+        g.menu.child_off.show()
         g.menu.child_start.hide()
         g.menu.child_stop.show()
-        g.tray.set_from_stock(Gtk.STOCK_YES)
+        g.tray.set_from_stock(Gtk.STOCK_MEDIA_PLAY)
     else:
+        g.menu.child_off.show()
         g.menu.child_stop.hide()
         g.menu.child_start.show()
-        g.tray.set_from_stock(Gtk.STOCK_NO)
+        g.tray.set_from_stock(Gtk.STOCK_MEDIA_PAUSE)
 
     max_w = 60
     max_h = 20
