@@ -5,7 +5,7 @@ from collections import namedtuple
 import cairo as C
 from gi.repository import Gtk, GObject
 
-Context = namedtuple('Context', 'conf start win tray menu')
+Context = namedtuple('Context', 'conf start active target win tray menu')
 Config = namedtuple('Config', 'app_dir timeout')
 
 
@@ -21,18 +21,23 @@ class Variable:
 
 def wavelog():
     g = Context(
-        conf=Config(timeout=1000, app_dir='./var/'),
+        conf=Config(timeout=500, app_dir='./var/'),
         start=Variable(),
+        active=Variable(False),
+        target=Variable(''),
         win=create_win(),
         menu=create_menu(),
         tray=create_icon(),
     )
 
-    update_img(g)
-
+    g.menu.start.connect('activate', toggle_target, True, g)
+    g.menu.stop.connect('activate', toggle_target, False, g)
     g.tray.connect('activate', toggle_win, g.win)
     g.tray.connect('popup-menu', show_menu, g.menu)
     GObject.timeout_add(g.conf.timeout, update_img, g)
+
+    toggle_target(g.menu.stop, False, g)
+    update_img(g)
 
 
 def toggle_win(widget, win):
@@ -62,21 +67,47 @@ def create_win():
 
 
 def create_menu():
+    start = Gtk.ImageMenuItem.new_from_stock(Gtk.STOCK_YES, None)
+    start.set_label('Start working')
+
+    stop = Gtk.ImageMenuItem.new_from_stock(Gtk.STOCK_NO, None)
+    stop.set_label('Stop working')
+
     about = Gtk.ImageMenuItem.new_from_stock(Gtk.STOCK_ABOUT, None)
     about.connect('activate', show_about)
+    about.show()
 
     quit = Gtk.ImageMenuItem.new_from_stock(Gtk.STOCK_QUIT, None)
     quit.connect('activate', Gtk.main_quit)
+    quit.show()
 
     menu = Gtk.Menu()
+    menu.append(start)
+    menu.append(stop)
     menu.append(about)
     menu.append(Gtk.SeparatorMenuItem())
     menu.append(quit)
+    menu.start = start
+    menu.stop = stop
     return menu
 
 
+def toggle_target(widget, flag, g):
+    if flag:
+        g.menu.start.hide()
+        g.menu.stop.show()
+        g.tray.set_from_stock(Gtk.STOCK_YES)
+        g.active.value = True
+        g.target.value = 'work'
+    else:
+        g.menu.stop.hide()
+        g.menu.start.show()
+        g.tray.set_from_stock(Gtk.STOCK_NO)
+        g.active.value = False
+        g.target.value = 'break'
+
+
 def show_menu(icon, e_button, e_time, menu):
-    menu.show_all()
     menu.popup(None, None, icon.position_menu, icon, e_button, e_time)
 
 
@@ -92,7 +123,6 @@ def show_about(widget):
 
 def create_icon():
     tray = Gtk.StatusIcon()
-    tray.set_from_stock(Gtk.STOCK_YES)
     return tray
 
 
@@ -114,14 +144,14 @@ def update_img(g):
     font_h = box_h - padding * 1.5
     font_rgb = (0, 0, 0)
     timer_w = box_w * 0.4 + padding
-    work_rgb = (0.6, 0.9, 0.6)
+    color = (0.6, 0.9, 0.6) if g.active.value else (0.7, 0.7, 0.7)
 
     icon_path = g.conf.app_dir + 'example.png'
     src = C.ImageSurface(C.FORMAT_ARGB32, max_w, max_h)
     ctx = C.Context(src)
 
     ctx.set_line_width(0.5)
-    ctx.set_source_rgb(*work_rgb)
+    ctx.set_source_rgb(*color)
 
     ctx.rectangle(0, 0, max_w, max_h)
     ctx.stroke()
@@ -138,9 +168,8 @@ def update_img(g):
     ctx.move_to(timer_w - text_w - padding, text_h + 2 * padding)
     ctx.show_text(text)
 
-    text = 'break'
     ctx.move_to(timer_w + padding, text_h + 2 * padding)
-    ctx.show_text(text)
+    ctx.show_text(g.target.value)
 
     line_h = 3
     step_sec = 2
