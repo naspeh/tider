@@ -200,7 +200,6 @@ def update_ui(g):
     max_w = int(max_h * 4)
     padding = max_h * 0.125
     box_h = max_h - 2 * padding
-    box_w = max_w - 2 * padding
     font_h = box_h * 0.77
     font_rgb = (0, 0, 0)
     timer_w = max_h * 1.25
