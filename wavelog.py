@@ -1,13 +1,29 @@
 #!/usr/bin/env python
+import argparse
+import os
+import socket
 import sqlite3
+import sys
 import time
 from collections import namedtuple
+from threading import Thread
 
 import cairo as C
 from gi.repository import Gtk, GObject
 
+GObject.threads_init()
 Context = namedtuple('Context', 'conf db start active target win tray menu')
-Config = namedtuple('Config', 'app_dir timeout')
+Config = namedtuple('Config', 'timeout sock_path db_path img_path')
+
+
+def get_config():
+    app_dir = os.path.join(os.path.dirname(__file__), 'var') + '/'
+    return Config(
+        timeout=500,
+        sock_path=app_dir + 'channel.sock',
+        db_path=app_dir + 'log.db',
+        img_path=app_dir + 'win.png'
+    )
 
 
 class Variable:
@@ -21,7 +37,7 @@ class Variable:
 
 
 def wavelog():
-    conf = Config(timeout=500, app_dir='./var/')
+    conf = get_config()
     g = Context(
         conf=conf,
         db=connect_db(conf),
@@ -55,6 +71,10 @@ def wavelog():
 
     update_ui(g)
 
+    server = Thread(target=run_server, args=(g,))
+    server.daemon = True
+    server.start()
+
 
 def main_quit(g):
     save_log(g)
@@ -75,6 +95,9 @@ def toggle_win(widget, win):
 
 
 def toggle_active(g, flag=True, target=None):
+    if g.start.value is None:
+        return False
+
     if g.start.value:
         save_log(g)
     if target:
@@ -84,6 +107,7 @@ def toggle_active(g, flag=True, target=None):
     g.active.value = flag
 
     update_ui(g)
+    return True
 
 
 def change_target(widget, g):
@@ -205,7 +229,7 @@ def update_ui(g):
     timer_w = max_h * 1.25
     color = (0.6, 0.9, 0.6) if g.active.value else (0.7, 0.7, 0.7)
 
-    icon_path = g.conf.app_dir + 'wavelog.png'
+    icon_path = g.conf.img_path
     src = C.ImageSurface(C.FORMAT_ARGB32, max_w, max_h)
     ctx = C.Context(src)
 
@@ -247,7 +271,7 @@ def update_ui(g):
 
 
 def connect_db(conf):
-    db_path = conf.app_dir + 'wavelog.db'
+    db_path = conf.db_path
     db = sqlite3.connect(db_path)
     cur = db.cursor()
     cur.execute(
@@ -294,6 +318,59 @@ def save_log(g):
         g.db.commit()
 
 
+def run_server(g):
+    sockfile = g.conf.sock_path
+    if os.path.exists(sockfile):
+        os.remove(sockfile)
+    s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+    s.bind(sockfile)
+    s.listen(1)
+
+    while True:
+        conn, addr = s.accept()
+        while True:
+            data = conn.recv(1024)
+            GObject.idle_add(do_action, g, data.decode())
+            if not data:
+                break
+
+    conn.close()
+
+
+def send_action(action):
+    conf = get_config()
+    sockfile = conf.sock_path
+    s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+    s.connect(sockfile)
+    s.send(action.encode())
+    s.close()
+
+
+def do_action(g, action):
+    if action == 'target':
+        g.menu.child_target.emit('activate')
+    elif action == 'toggle-active':
+        toggle_active(g, False if g.active.value else True)
+    elif action == 'quit':
+        main_quit(g)
+
+
+def parse_args(args):
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        '-a', '--action', choices=['target', 'toggle-active', 'quit'],
+        help='choice some action'
+    )
+    args = parser.parse_args(args)
+
+    if args.action:
+        send_action(args.action)
+
+
 if __name__ == '__main__':
-    wavelog()
-    Gtk.main()
+    args = sys.argv[1:]
+    if not args:
+        wavelog()
+        Gtk.main()
+    else:
+        parse_args(args)
