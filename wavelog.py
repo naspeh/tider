@@ -72,6 +72,8 @@ def wavelog():
     server.daemon = True
     server.start()
 
+    Gtk.main()
+
 
 def main_quit(g):
     save_log(g)
@@ -202,6 +204,34 @@ def create_menu():
     return menu
 
 
+def get_tooltip(g):
+    if g.start.value is None:
+        return ('<b><big>Wavelog is disabled</big></b>')
+
+    duration = int((time.time() - g.start.value) / 60)
+    started = time.strftime('%H:%M:%S', time.gmtime(g.start.value))
+    if g.active.value:
+        return (
+            '<b><big>Working</big></b>\n'
+            'target: <b>{target}</b>\n'
+            'started: <b>{started}</b>\n'
+            'duration: <b>{duration} minutes</b>'
+        ).format(
+            target=g.target.value,
+            started=started,
+            duration=duration
+        )
+    else:
+        return (
+            '<b><big>Pause</big></b>\n'
+            'started: <b>{started}</b>\n'
+            'duration: <b>{duration} minutes</b>'
+        ).format(
+            started=started,
+            duration=duration,
+        )
+
+
 def update_ui(g):
     duration = {'total': 0}
     if g.start.value:
@@ -278,6 +308,7 @@ def update_ui(g):
     src.write_to_png(icon_path)
     #tray.set_from_file(icon_path)
     g.win.img.set_from_file(icon_path)
+    g.tray.set_tooltip_markup(get_tooltip(g))
     return True
 
 
@@ -386,6 +417,5 @@ if __name__ == '__main__':
     args = sys.argv[1:]
     if not args:
         wavelog()
-        Gtk.main()
     else:
         parse_args(args)
