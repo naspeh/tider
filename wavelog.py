@@ -206,16 +206,16 @@ def create_menu():
 
 def get_tooltip(g):
     if g.start.value is None:
-        return ('<b><big>Wavelog is disabled</big></b>')
+        return ('<b>Wavelog is disabled</b>')
 
-    duration = int((time.time() - g.start.value) / 60)
-    started = time.strftime('%H:%M:%S', time.gmtime(g.start.value))
+    duration = time.strftime('%H:%M', time.gmtime(time.time() - g.start.value))
+    started = time.strftime('%H:%M:%S', time.localtime(g.start.value))
     if g.active.value:
         return (
             '<b><big>Working</big></b>\n'
             'target: <b>{target}</b>\n'
-            'started: <b>{started}</b>\n'
-            'duration: <b>{duration} minutes</b>'
+            'started at: <b>{started}</b>\n'
+            'duration: <b>{duration}</b>'
         ).format(
             target=g.target.value,
             started=started,
@@ -224,8 +224,8 @@ def get_tooltip(g):
     else:
         return (
             '<b><big>Pause</big></b>\n'
-            'started: <b>{started}</b>\n'
-            'duration: <b>{duration} minutes</b>'
+            'started at: <b>{started}</b>\n'
+            'duration: <b>{duration}</b>'
         ).format(
             started=started,
             duration=duration,
@@ -233,11 +233,10 @@ def get_tooltip(g):
 
 
 def update_ui(g):
-    duration = {'total': 0}
+    duration_sec = 0
     if g.start.value:
-        duration['total'] = int(time.time() - g.start.value)
-    duration['min'] = int(duration['total'] / 60)
-    duration['sec'] = duration['total'] - duration['min'] * 60
+        duration_sec = int(time.time() - g.start.value)
+    duration = time.gmtime(duration_sec)
 
     if g.start.value is None:
         g.menu.child_off.hide()
@@ -259,16 +258,16 @@ def update_ui(g):
         duration_text = ''
         target_text = 'OFF'
     else:
-        duration_text = str(duration['min'])
         target_text = g.target.value
+        duration_text = '{}:{:02d}'.format(duration.tm_hour, duration.tm_min)
 
-    max_h = 20
-    max_w = int(max_h * 4)
+    max_h = 18
+    max_w = int(max_h * 5)
     padding = max_h * 0.125
     box_h = max_h - 2 * padding
     font_h = box_h * 0.77
     font_rgb = (0, 0, 0)
-    timer_w = max_h * 1.25
+    timer_w = max_h * 1.5
     color = (0.6, 0.9, 0.6) if g.active.value else (0.7, 0.7, 0.7)
 
     icon_path = g.conf.img_path
@@ -298,7 +297,7 @@ def update_ui(g):
     line_h = padding * 0.7
     step_sec = 2
     step_w = timer_w * step_sec / 60
-    duration_w = int(duration['sec'] / step_sec) * step_w
+    duration_w = int(duration.tm_sec / step_sec) * step_w
     ctx.set_line_width(line_h)
     ctx.set_source_rgb(0, 0, 0.7)
     ctx.move_to(timer_w, max_h - line_h / 2)
