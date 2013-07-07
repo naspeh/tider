@@ -1,7 +1,7 @@
 Lightweight GTK+ time tracking tool
 -----------------------------------
 
-Rework some functionality from workrave_ and hamster-applet_ in one lightweight tool.
+Reworking some functionality from workrave_ and hamster-applet_ to one lightweight tool.
 
 P.S. In development.
 
