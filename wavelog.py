@@ -196,14 +196,14 @@ def update_ui(g):
         g.menu.child_start.show()
         g.tray.set_from_stock(Gtk.STOCK_MEDIA_PAUSE)
 
-    max_w = 60
     max_h = 20
-    padding = max_h / 8
+    max_w = int(max_h * 4)
+    padding = max_h * 0.125
     box_h = max_h - 2 * padding
     box_w = max_w - 2 * padding
-    font_h = box_h - padding * 1.5
+    font_h = box_h * 0.77
     font_rgb = (0, 0, 0)
-    timer_w = box_w * 0.4 + padding
+    timer_w = max_h * 1.25
     color = (0.6, 0.9, 0.6) if g.active.value else (0.7, 0.7, 0.7)
 
     icon_path = g.conf.app_dir + 'wavelog.png'
@@ -225,13 +225,13 @@ def update_ui(g):
 
     text = str(duration['min'])
     text_w, text_h = ctx.text_extents(text)[2:4]
-    ctx.move_to(timer_w - text_w - padding, text_h + 2 * padding)
+    ctx.move_to(timer_w - text_w - padding, font_h + padding)
     ctx.show_text(text)
 
-    ctx.move_to(timer_w + padding, text_h + 2 * padding)
+    ctx.move_to(timer_w + padding, font_h + padding)
     ctx.show_text(g.target.value)
 
-    line_h = 3
+    line_h = padding * 0.7
     step_sec = 2
     step_w = timer_w * step_sec / 60
     duration_w = int(duration['sec'] / step_sec) * step_w
