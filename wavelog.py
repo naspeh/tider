@@ -9,7 +9,7 @@ from collections import namedtuple
 from threading import Thread
 
 import cairo as C
-from gi.repository import Gtk, GObject
+from gi.repository import Gdk, Gtk, GObject
 
 GObject.threads_init()
 Context = namedtuple('Context', 'conf db start active target win tray menu')
@@ -58,13 +58,10 @@ def wavelog():
     g.menu.child_stop.connect('activate', lambda x: toggle_active(g, False))
     g.menu.child_target.connect('activate', change_target, g)
 
-    g.tray.connect('activate', toggle_win, g.win)
-    g.tray.connect(
-        'popup-menu',
-        lambda icon, button, time: (
-            g.menu.popup(None, None, icon.position_menu, icon, button, time)
-        )
-    )
+    g.tray.connect('activate', change_target, g)
+    g.tray.connect('popup-menu', lambda icon, button, time: (
+        g.menu.popup(None, None, icon.position_menu, icon, button, time)
+    ))
     GObject.timeout_add(
         g.conf.timeout, lambda: g.start.value is None or update_ui(g)
     )
@@ -108,10 +105,20 @@ def toggle_active(g, flag=True, target=None):
 
 
 def change_target(widget, g):
-    dialog = Gtk.Dialog('Enter target')
-    box = dialog.get_content_area()
+    dialog = Gtk.Dialog('Enter target of activity')
+
     entry = Gtk.Entry()
     entry.set_text(g.target.value)
+    entry.connect('key-press-event', lambda w, e: (
+        e.keyval == Gdk.KEY_Return and dialog.response(Gtk.ResponseType.OK)
+    ))
+
+    label = Gtk.Label()
+    label.set_markup('<b>Enter target of activity:</b>')
+    label.set_justify(Gtk.Justification.LEFT)
+
+    box = dialog.get_content_area()
+    box.add(label)
     box.add(entry)
     dialog.add_buttons(
         Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL,
@@ -155,13 +162,13 @@ def create_win():
 
 def create_menu():
     start = Gtk.ImageMenuItem.new_from_stock(Gtk.STOCK_MEDIA_PLAY, None)
-    start.set_label('Start working')
+    start.set_label('Start activity')
 
     stop = Gtk.ImageMenuItem.new_from_stock(Gtk.STOCK_MEDIA_PAUSE, None)
-    stop.set_label('Stop working')
+    stop.set_label('Pause')
 
     off = Gtk.ImageMenuItem.new_from_stock(Gtk.STOCK_MEDIA_STOP, None)
-    off.set_label('OFF')
+    off.set_label('Disable')
 
     target = Gtk.ImageMenuItem.new_from_stock(Gtk.STOCK_OK, None)
     target.set_label('Change target')
@@ -243,13 +250,14 @@ def update_ui(g):
     #ctx.select_font_face('Mono', C.FONT_SLANT_NORMAL, C.FONT_WEIGHT_BOLD)
     ctx.set_font_size(font_h)
 
-    text = str(duration['min'])
+    text = '' if g.start.value is None else str(duration['min'])
     text_w, text_h = ctx.text_extents(text)[2:4]
     ctx.move_to(timer_w - text_w - padding, font_h + padding)
     ctx.show_text(text)
 
+    text = 'OFF' if g.start.value is None else g.target.value
     ctx.move_to(timer_w + padding, font_h + padding)
-    ctx.show_text(g.target.value)
+    ctx.show_text(text)
 
     line_h = padding * 0.7
     step_sec = 2
