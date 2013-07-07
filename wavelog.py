@@ -81,6 +81,7 @@ def main_quit(g):
 def disable(widget, g):
     save_log(g)
     g.start.value = None
+    g.active.value = False
     update_ui(g)
 
 
@@ -224,6 +225,13 @@ def update_ui(g):
         g.menu.child_start.show()
         g.tray.set_from_stock(Gtk.STOCK_MEDIA_PAUSE)
 
+    if g.start.value is None:
+        duration_text = ''
+        target_text = 'OFF'
+    else:
+        duration_text = str(duration['min'])
+        target_text = g.target.value
+
     max_h = 20
     max_w = int(max_h * 4)
     padding = max_h * 0.125
@@ -250,14 +258,12 @@ def update_ui(g):
     #ctx.select_font_face('Mono', C.FONT_SLANT_NORMAL, C.FONT_WEIGHT_BOLD)
     ctx.set_font_size(font_h)
 
-    text = '' if g.start.value is None else str(duration['min'])
-    text_w, text_h = ctx.text_extents(text)[2:4]
+    text_w, text_h = ctx.text_extents(duration_text)[2:4]
     ctx.move_to(timer_w - text_w - padding, font_h + padding)
-    ctx.show_text(text)
+    ctx.show_text(duration_text)
 
-    text = 'OFF' if g.start.value is None else g.target.value
     ctx.move_to(timer_w + padding, font_h + padding)
-    ctx.show_text(text)
+    ctx.show_text(target_text)
 
     line_h = padding * 0.7
     step_sec = 2
@@ -358,6 +364,8 @@ def do_action(g, action):
         if g.start.value is None:
             return False
         toggle_active(g, False if g.active.value else True)
+    elif action == 'disable':
+        g.menu.child_off.emit('activate')
     elif action == 'quit':
         main_quit(g)
 
@@ -365,8 +373,8 @@ def do_action(g, action):
 def parse_args(args):
     parser = argparse.ArgumentParser()
     parser.add_argument(
-        '-a', '--action', choices=['target', 'toggle-active', 'quit'],
-        help='choice some action'
+        '-a', '--action', help='choice action',
+        choices=['target', 'toggle-active', 'disable', 'quit']
     )
     args = parser.parse_args(args)
 
