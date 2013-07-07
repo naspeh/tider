@@ -95,9 +95,6 @@ def toggle_win(widget, win):
 
 
 def toggle_active(g, flag=True, target=None):
-    if g.start.value is None:
-        return False
-
     if g.start.value:
         save_log(g)
     if target:
@@ -350,6 +347,8 @@ def do_action(g, action):
     if action == 'target':
         g.menu.child_target.emit('activate')
     elif action == 'toggle-active':
+        if g.start.value is None:
+            return False
         toggle_active(g, False if g.active.value else True)
     elif action == 'quit':
         main_quit(g)
