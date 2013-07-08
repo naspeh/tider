@@ -2,7 +2,6 @@ import argparse
 import os
 import socket
 import sqlite3
-import sys
 import time
 from collections import namedtuple
 from threading import Thread
