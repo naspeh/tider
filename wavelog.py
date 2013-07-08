@@ -433,7 +433,9 @@ def send_action(conf, action):
 
 def get_report(conf, interval=None):
     if not interval:
-        interval = [time.strftime('%Y-%m-%d', time.localtime())] * 2
+        interval = [time.strftime('%Y-%m-%d', time.localtime())]
+    if len(interval) == 1:
+        interval = interval * 2
 
     db = connect_db(conf)
     cursor = db.cursor()
@@ -457,7 +459,7 @@ def get_report(conf, interval=None):
     if interval[0] == interval[1]:
         result = ['Statistics for {}'.format(interval[0])]
     else:
-        result = ['Statistics from {} to {}'].format(*interval)
+        result = ['Statistics from {} to {}'.format(*interval)]
 
     result += [
         '\n'
@@ -484,7 +486,13 @@ def get_report(conf, interval=None):
 
 
 def print_report(conf, args):
-    report = get_report(conf)
+    interval = None
+    if args.interval:
+        if len(args.interval) == 2 and args.interval[0] > args.interval[1]:
+            raise SystemExit('Wrong interval: second date less than first')
+        interval = [time.strftime('%Y-%m-%d', i) for i in args.interval]
+
+    report = get_report(conf, interval)
     print(report)
 
 
@@ -511,6 +519,11 @@ def main(args):
 
     sub_report = subs.add_parser('report', aliases=['re'], help='print report')
     sub_report.set_defaults(func=lambda: print_report(conf, args))
+    sub_report.add_argument(
+        '-i', '--interval',
+        help='date interval in format: YYYY-MM-DD or YYYY-MM-DD:YYYY-MM-DD',
+        type=lambda v: [time.strptime(i, '%Y-%m-%d') for i in v.split(':', 1)]
+    )
 
     args = parser.parse_args(args)
     args.func()
