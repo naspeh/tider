@@ -233,7 +233,7 @@ def get_tooltip(g):
     if not g.start.value:
         return ('<b>Wavelog is disabled</b>')
 
-    duration = str_secs(duration)
+    duration = str_secs(time.time() - g.start.value)
     started = time.strftime('%H:%M:%S', time.localtime(g.start.value))
     if g.active.value:
         result = (
@@ -429,13 +429,14 @@ def send_action(conf, action):
 
 
 def str_secs(duration):
-    hours  = int(duration / 60 / 60)
+    hours = int(duration / 60 / 60)
     minutes = int(duration / 60 % 60)
     seconds = int(duration % 60)
     result = '{}h '.format(hours) if hours else ''
     result += '{:02d}m '.format(minutes) if hours or minutes else ''
     result += '{:02d}s'.format(seconds)
     return result
+
 
 def get_report(conf, interval=None):
     if not interval:
