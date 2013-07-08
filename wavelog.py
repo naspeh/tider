@@ -233,8 +233,7 @@ def get_tooltip(g):
     if not g.start.value:
         return ('<b>Wavelog is disabled</b>')
 
-    duration = time.gmtime(time.time() - g.start.value)
-    duration = time.strftime('%H hr %M min', duration)
+    duration = str_secs(duration)
     started = time.strftime('%H:%M:%S', time.localtime(g.start.value))
     if g.active.value:
         result = (
@@ -429,6 +428,15 @@ def send_action(conf, action):
     s.close()
 
 
+def str_secs(duration):
+    hours  = int(duration / 60 / 60)
+    minutes = int(duration / 60 % 60)
+    seconds = int(duration % 60)
+    result = '{}h '.format(hours) if hours else ''
+    result += '{:02d}m '.format(minutes) if hours or minutes else ''
+    result += '{:02d}s'.format(seconds)
+    return result
+
 def get_report(conf, interval=None):
     if not interval:
         interval = [time.strftime('%Y-%m-%d', time.localtime())]
@@ -444,7 +452,6 @@ def get_report(conf, interval=None):
         '   ORDER BY 2 DESC',
         [str(1 if is_active else 0)] + interval
     )
-    duration_str = lambda v: '{} min {} sec'.format(int(v / 60), v % 60)
 
     duration_sql(False)
     pauses = cursor.fetchall()
@@ -461,17 +468,17 @@ def get_report(conf, interval=None):
 
     result += [
         '\n'
-        'Total working: {}'.format(duration_str(sum(working_dict.values()))),
-        'Total breaks: {}'.format(duration_str(sum(pauses_dict.values()))),
+        'Total working: {}'.format(str_secs(sum(working_dict.values()))),
+        'Total breaks: {}'.format(str_secs(sum(pauses_dict.values()))),
     ]
 
     if working:
         result += ['\nWorking time with breaks by target:']
         for target, dur in working:
             pause = pauses_dict.pop(target, 0)
-            line = '  {}: {}'.format(target, duration_str(dur))
+            line = '  {}: {}'.format(target, str_secs(dur))
             if pause:
-                line += ' (and breaks: {})'.format(duration_str(pause))
+                line += ' (and breaks: {})'.format(str_secs(pause))
             result += [line]
 
     if pauses_dict:
@@ -479,7 +486,7 @@ def get_report(conf, interval=None):
         for target, dur in pauses:
             if target not in pauses_dict:
                 continue
-            result += ['  {}: {}'.format(target, duration_str(dur))]
+            result += ['  {}: {}'.format(target, str_secs(dur))]
     return '\n'.join(result)
 
 
