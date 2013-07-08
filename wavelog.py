@@ -242,7 +242,7 @@ def get_tooltip(g):
     duration = time.strftime('%H:%M', time.gmtime(time.time() - g.start.value))
     started = time.strftime('%H:%M:%S', time.localtime(g.start.value))
     if g.active.value:
-        return (
+        result = (
             '<b><big>Working</big></b>\n'
             'target: <b>{target}</b>\n'
             'started at: <b>{started}</b>\n'
@@ -253,7 +253,7 @@ def get_tooltip(g):
             duration=duration
         )
     else:
-        return (
+        result = (
             '<b><big>Pause</big></b>\n'
             'started at: <b>{started}</b>\n'
             'duration: <b>{duration}</b>'
@@ -261,6 +261,8 @@ def get_tooltip(g):
             started=started,
             duration=duration,
         )
+    result += '\n=================\n' + get_report(g.conf)
+    return result
 
 
 def update_ui(g):
@@ -343,8 +345,7 @@ def update_ui(g):
 
 
 def connect_db(conf):
-    db_path = conf.db_path
-    db = sqlite3.connect(db_path)
+    db = sqlite3.connect(conf.db_path)
     cur = db.cursor()
     cur.execute(
         'SELECT name FROM sqlite_master WHERE type="table" AND name="log"'
@@ -409,15 +410,6 @@ def run_server(g):
     conn.close()
 
 
-def send_action(action):
-    conf = get_config()
-    sockfile = conf.sock_path
-    s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
-    s.connect(sockfile)
-    s.send(action.encode())
-    s.close()
-
-
 def do_action(g, action):
     if action == 'target':
         g.menu.child_target.emit('activate')
@@ -429,6 +421,71 @@ def do_action(g, action):
         g.menu.child_off.emit('activate')
     elif action == 'quit':
         main_quit(g)
+
+
+def send_action(conf, action):
+    sockfile = conf.sock_path
+    s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+    s.connect(sockfile)
+    s.send(action.encode())
+    s.close()
+
+
+def get_report(conf, interval=None):
+    if not interval:
+        interval = [time.strftime('%Y-%m-%d', time.localtime())] * 2
+
+    db = connect_db(conf)
+    cursor = db.cursor()
+    duration_sql = lambda is_active: cursor.execute(
+        'SELECT target, SUM(duration) FROM log'
+        '   WHERE is_active=? AND date(started) BETWEEN date(?) AND date(?)'
+        '   GROUP BY target'
+        '   ORDER BY 2 DESC',
+        [str(1 if is_active else 0)] + interval
+    )
+    duration_str = lambda v: '{} min {} sec'.format(int(v / 60), v % 60)
+
+    duration_sql(False)
+    pauses = cursor.fetchall()
+    pauses_dict = dict(pauses)
+
+    duration_sql(True)
+    working = cursor.fetchall()
+    working_dict = dict(working)
+
+    if interval[0] == interval[1]:
+        result = ['Statistics for {}'.format(interval[0])]
+    else:
+        result = ['Statistics from {} to {}'].format(*interval)
+
+    result += [
+        '\n'
+        'Total working: {}'.format(duration_str(sum(working_dict.values()))),
+        'Total breaks: {}'.format(duration_str(sum(pauses_dict.values()))),
+    ]
+
+    if working:
+        result += ['\nWorking time with breaks by target:']
+        for target, dur in working:
+            pause = pauses_dict.pop(target, 0)
+            line = '  {}: {}'.format(target, duration_str(dur))
+            if pause:
+                line += ' (and breaks: {})'.format(duration_str(pause))
+            result += [line]
+
+    if pauses_dict:
+        result += ['\nBreaks only by target:']
+        for target, dur in pauses:
+            if target not in pauses_dict:
+                continue
+            result += ['  {}: {}'.format(target, duration_str(dur))]
+    return '\n'.join(result)
+
+
+def print_report(conf, args):
+    report = get_report(conf)
+    print(report)
 
 
 def main(args):
@@ -445,12 +502,15 @@ def main(args):
         'action', help='choice action',
         choices=['target', 'toggle-active', 'disable', 'quit']
     )
-    sub_do.set_defaults(func=lambda: send_action(args.action))
+    sub_do.set_defaults(func=lambda: send_action(conf, args.action))
 
     sub_db = subs.add_parser('db', help='enter to sqlite session')
     sub_db.set_defaults(func=lambda: (
         subprocess.check_call('sqlite3 {}'.format(conf.db_path), shell=True)
     ))
+
+    sub_report = subs.add_parser('report', aliases=['re'], help='print report')
+    sub_report.set_defaults(func=lambda: print_report(conf, args))
 
     args = parser.parse_args(args)
     args.func()
