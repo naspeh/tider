@@ -1,4 +1,3 @@
-#!/usr/bin/env python
 import argparse
 import os
 import socket
@@ -400,7 +399,11 @@ def do_action(g, action):
         main_quit(g)
 
 
-def parse_args(args):
+def main(args):
+    if not args:
+        wavelog()
+        return
+
     parser = argparse.ArgumentParser()
     parser.add_argument(
         '-a', '--action', help='choice action',
@@ -410,11 +413,3 @@ def parse_args(args):
 
     if args.action:
         send_action(args.action)
-
-
-if __name__ == '__main__':
-    args = sys.argv[1:]
-    if not args:
-        wavelog()
-    else:
-        parse_args(args)
