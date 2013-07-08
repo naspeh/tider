@@ -42,7 +42,7 @@ def wavelog():
         db=connect_db(conf),
         start=Variable(),
         active=Variable(False),
-        target=Variable('OFF'),
+        target=Variable('Enter activity name..'),
         win=create_win(),
         menu=create_menu(),
         tray=Gtk.StatusIcon(),
@@ -110,18 +110,16 @@ def set_activity(g, active, target=None):
 
 
 def change_target(widget, g):
-    dialog = Gtk.Dialog('Enter target of activity')
+    dialog = Gtk.Dialog('Set activity')
+    box = dialog.get_content_area()
     press_enter = lambda w, e: (
         e.keyval == Gdk.KEY_Return and dialog.response(Gtk.ResponseType.OK)
     )
 
-    entry = Gtk.Entry()
-    entry.set_text(g.target.value)
-    entry.connect('key-press-event', press_enter)
-
-    label = Gtk.Label()
-    label.set_markup('<b>Enter target of activity:</b>')
-    label.set_justify(Gtk.Justification.LEFT)
+    name = Gtk.Entry()
+    name.set_text(g.target.value)
+    name.connect('key-press-event', press_enter)
+    box.add(name)
 
     start = Gtk.RadioButton.new_from_widget(None)
     start.set_label('start working')
@@ -135,15 +133,12 @@ def change_target(widget, g):
     off = Gtk.RadioButton.new_from_widget(start)
     off.set_label('disable program')
     off.connect('key-press-event', press_enter)
-
-    box = dialog.get_content_area()
-    box.add(label)
-    box.add(entry)
     box.add(start)
     box.add(pause)
     if g.start.value:
         box.add(fix)
         box.add(off)
+
     dialog.add_buttons(
         Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL,
         Gtk.STOCK_OK, Gtk.ResponseType.OK
@@ -152,7 +147,7 @@ def change_target(widget, g):
     response = dialog.run()
 
     if response == Gtk.ResponseType.OK:
-        target = entry.get_text().strip()
+        target = name.get_text().strip()
         if start.get_active():
             set_activity(g, True, target=target)
         elif pause.get_active():
@@ -205,7 +200,7 @@ def create_menu():
     off.set_label('Disable program')
 
     target = Gtk.ImageMenuItem.new_from_stock(Gtk.STOCK_OK, None)
-    target.set_label('Change target')
+    target.set_label('Set activity')
     target.show()
 
     separator = Gtk.SeparatorMenuItem()
@@ -239,7 +234,8 @@ def get_tooltip(g):
     if not g.start.value:
         return ('<b>Wavelog is disabled</b>')
 
-    duration = time.strftime('%H:%M', time.gmtime(time.time() - g.start.value))
+    duration = time.gmtime(time.time() - g.start.value)
+    duration = time.strftime('%H hr %M min', duration)
     started = time.strftime('%H:%M:%S', time.localtime(g.start.value))
     if g.active.value:
         result = (
