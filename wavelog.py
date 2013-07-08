@@ -110,52 +110,40 @@ def set_activity(g, active, target=None):
 
 
 def change_target(widget, g):
-    dialog = Gtk.Dialog('Set activity')
+    dialog = Gtk.Dialog('Enter target of activity')
     press_enter = lambda w, e: (
         e.keyval == Gdk.KEY_Return and dialog.response(Gtk.ResponseType.OK)
     )
 
-    table = Gtk.Table(4, 3)
-    table.set_col_spacings(6)
+    entry = Gtk.Entry()
+    entry.set_text(g.target.value)
+    entry.connect('key-press-event', press_enter)
 
     label = Gtk.Label()
-    label.set_markup('<b>Name:</b>')
-    name = Gtk.Entry()
-    name.set_text(g.target.value)
-    name.connect('key-press-event', press_enter)
-    table.attach(label, 0, 1, 0, 1)
-    table.attach(name, 1, 4, 0, 1)
+    label.set_markup('<b>Enter target of activity:</b>')
+    label.set_justify(Gtk.Justification.LEFT)
 
-    label = Gtk.Label()
-    label.set_markup('<b>Type:</b>')
-    working = Gtk.RadioButton.new_from_widget(None)
-    working.set_label('working')
-    working.connect('key-press-event', press_enter)
-    pause = Gtk.RadioButton.new_from_widget(working)
-    pause.set_label('break')
-    pause.connect('key-press-event', press_enter)
-    table.attach(label, 0, 1, 1, 2)
-    table.attach(working, 1, 2, 1, 2)
-    table.attach(pause, 2, 3, 1, 2)
-
-    label = Gtk.Label()
-    label.set_markup('<b>Action:</b>')
     start = Gtk.RadioButton.new_from_widget(None)
-    start.set_label('start')
+    start.set_label('start working')
     start.connect('key-press-event', press_enter)
-    replace = Gtk.RadioButton.new_from_widget(start)
-    replace.set_label('replace')
-    replace.connect('key-press-event', press_enter)
-    reject = Gtk.RadioButton.new_from_widget(start)
-    reject.set_label('reject')
-    reject.connect('key-press-event', press_enter)
-    if g.start.value:
-        table.attach(label, 0, 1, 2, 3)
-        table.attach(start, 1, 2, 2, 3)
-        table.attach(replace, 2, 3, 2, 3)
-        table.attach(reject, 3, 4, 2, 3)
+    pause = Gtk.RadioButton.new_from_widget(start)
+    pause.set_label('start break')
+    pause.connect('key-press-event', press_enter)
+    fix = Gtk.RadioButton.new_from_widget(start)
+    fix.set_label('fix current target')
+    fix.connect('key-press-event', press_enter)
+    off = Gtk.RadioButton.new_from_widget(start)
+    off.set_label('disable program')
+    off.connect('key-press-event', press_enter)
 
-    dialog.get_content_area().add(table)
+    box = dialog.get_content_area()
+    box.add(label)
+    box.add(entry)
+    box.add(start)
+    box.add(pause)
+    if g.start.value:
+        box.add(fix)
+        box.add(off)
     dialog.add_buttons(
         Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL,
         Gtk.STOCK_OK, Gtk.ResponseType.OK
@@ -164,14 +152,17 @@ def change_target(widget, g):
     response = dialog.run()
 
     if response == Gtk.ResponseType.OK:
-        target = name.get_text().strip()
-        active = working.get_active()
-        if replace.get_active():
+        target = entry.get_text().strip()
+        if start.get_active():
+            set_activity(g, True, target=target)
+        elif pause.get_active():
+            set_activity(g, False, target=target)
+        elif fix.get_active():
             g.target.value = target
-            g.active.value = active
-        elif reject.get_active():
-            g.start.value = None
-        set_activity(g, active, target=target)
+        elif off.get_active():
+            g.menu.child_off.emit('activate')
+        else:
+            raise ValueError('wrong state')
 
     dialog.destroy()
 
@@ -214,7 +205,7 @@ def create_menu():
     off.set_label('Disable program')
 
     target = Gtk.ImageMenuItem.new_from_stock(Gtk.STOCK_OK, None)
-    target.set_label('Set activity')
+    target.set_label('Change target')
     target.show()
 
     separator = Gtk.SeparatorMenuItem()
@@ -248,8 +239,7 @@ def get_tooltip(g):
     if not g.start.value:
         return ('<b>Wavelog is disabled</b>')
 
-    duration = time.gmtime(time.time() - g.start.value)
-    duration = time.strftime('%H hr %M min', duration)
+    duration = time.strftime('%H:%M', time.gmtime(time.time() - g.start.value))
     started = time.strftime('%H:%M:%S', time.localtime(g.start.value))
     if g.active.value:
         result = (
