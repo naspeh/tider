@@ -92,14 +92,15 @@ def toggle_win(widget, win):
         win.show_all()
 
 
-def toggle_active(g, flag=True, target=None):
-    if g.start.value:
+def toggle_active(g, flag=True, target=None, action='start'):
+    if g.start.value and action != 'fix':
         save_log(g)
     if target:
         g.target.value = target
 
-    g.start.value = time.time()
-    g.active.value = flag
+    if action != 'fix':
+        g.start.value = time.time()
+        g.active.value = action == 'start'
 
     update_ui(g)
     return True
@@ -110,26 +111,47 @@ def change_target(widget, g):
 
     entry = Gtk.Entry()
     entry.set_text(g.target.value)
-    entry.connect('key-press-event', lambda w, e: (
+    press_enter = lambda w, e: (
         e.keyval == Gdk.KEY_Return and dialog.response(Gtk.ResponseType.OK)
-    ))
+    )
+    entry.connect('key-press-event', press_enter)
 
     label = Gtk.Label()
     label.set_markup('<b>Enter target of activity:</b>')
     label.set_justify(Gtk.Justification.LEFT)
 
+    start = Gtk.RadioButton.new_from_widget(None)
+    start.set_label('start working')
+    start.connect('key-press-event', press_enter)
+    pause = Gtk.RadioButton.new_from_widget(start)
+    pause.set_label('start pause')
+    pause.connect('key-press-event', press_enter)
+    fix = Gtk.RadioButton.new_from_widget(start)
+    fix.set_label('fix current target')
+    fix.connect('key-press-event', press_enter)
+
     box = dialog.get_content_area()
     box.add(label)
     box.add(entry)
+    box.add(start)
+    box.add(pause)
+    box.add(fix)
     dialog.add_buttons(
         Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL,
         Gtk.STOCK_OK, Gtk.ResponseType.OK
     )
     dialog.show_all()
-
     response = dialog.run()
+
+    if start.get_active():
+        action = 'start'
+    elif pause.get_active():
+        action = 'pause'
+    else:
+        action = 'fix'
+
     if response == Gtk.ResponseType.OK:
-        toggle_active(g, target=entry.get_text())
+        toggle_active(g, target=entry.get_text(), action=action)
 
     dialog.destroy()
 
@@ -391,7 +413,7 @@ def do_action(g, action):
     elif action == 'toggle-active':
         if g.start.value is None:
             return False
-        toggle_active(g, False if g.active.value else True)
+        toggle_active(g, not g.active.value)
     elif action == 'disable':
         g.menu.child_off.emit('activate')
     elif action == 'quit':
