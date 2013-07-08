@@ -52,8 +52,8 @@ def wavelog():
 
     g.menu.child_quit.connect('activate', lambda x: main_quit(g))
     g.menu.child_off.connect('activate', disable, g)
-    g.menu.child_start.connect('activate', lambda x: toggle_active(g, True))
-    g.menu.child_stop.connect('activate', lambda x: toggle_active(g, False))
+    g.menu.child_start.connect('activate', lambda x: set_activity(g, True))
+    g.menu.child_stop.connect('activate', lambda x: set_activity(g, False))
     g.menu.child_target.connect('activate', change_target, g)
 
     g.tray.connect('activate', change_target, g)
@@ -61,7 +61,7 @@ def wavelog():
         g.menu.popup(None, None, icon.position_menu, icon, button, time)
     ))
     GObject.timeout_add(
-        g.conf.timeout, lambda: g.start.value is None or update_ui(g)
+        g.conf.timeout, lambda: not g.start.value or update_ui(g)
     )
 
     update_ui(g)
@@ -92,28 +92,30 @@ def toggle_win(widget, win):
         win.show_all()
 
 
-def toggle_active(g, flag=True, target=None, action='start'):
-    if g.start.value and action != 'fix':
-        save_log(g)
-    if target:
-        g.target.value = target
+def set_activity(g, active, target=None):
+    assert active in [False, True]
 
-    if action != 'fix':
-        g.start.value = time.time()
-        g.active.value = action == 'start'
+    if not target:
+        target = g.target.value
 
+    if g.start.value and target == g.target.value and active == g.active.value:
+        return
+
+    save_log(g)
+    g.start.value = time.time()
+    g.target.value = target
+    g.active.value = active
     update_ui(g)
-    return True
 
 
 def change_target(widget, g):
     dialog = Gtk.Dialog('Enter target of activity')
-
-    entry = Gtk.Entry()
-    entry.set_text(g.target.value)
     press_enter = lambda w, e: (
         e.keyval == Gdk.KEY_Return and dialog.response(Gtk.ResponseType.OK)
     )
+
+    entry = Gtk.Entry()
+    entry.set_text(g.target.value)
     entry.connect('key-press-event', press_enter)
 
     label = Gtk.Label()
@@ -124,18 +126,23 @@ def change_target(widget, g):
     start.set_label('start working')
     start.connect('key-press-event', press_enter)
     pause = Gtk.RadioButton.new_from_widget(start)
-    pause.set_label('start pause')
+    pause.set_label('start break')
     pause.connect('key-press-event', press_enter)
     fix = Gtk.RadioButton.new_from_widget(start)
     fix.set_label('fix current target')
     fix.connect('key-press-event', press_enter)
+    off = Gtk.RadioButton.new_from_widget(start)
+    off.set_label('disable program')
+    off.connect('key-press-event', press_enter)
 
     box = dialog.get_content_area()
     box.add(label)
     box.add(entry)
     box.add(start)
     box.add(pause)
-    box.add(fix)
+    if g.start.value:
+        box.add(fix)
+        box.add(off)
     dialog.add_buttons(
         Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL,
         Gtk.STOCK_OK, Gtk.ResponseType.OK
@@ -143,15 +150,18 @@ def change_target(widget, g):
     dialog.show_all()
     response = dialog.run()
 
-    if start.get_active():
-        action = 'start'
-    elif pause.get_active():
-        action = 'pause'
-    else:
-        action = 'fix'
-
     if response == Gtk.ResponseType.OK:
-        toggle_active(g, target=entry.get_text(), action=action)
+        target = entry.get_text().strip()
+        if start.get_active():
+            set_activity(g, True, target=target)
+        elif pause.get_active():
+            set_activity(g, False, target=target)
+        elif fix.get_active():
+            g.target.value = target
+        elif off.get_active():
+            g.menu.child_off.emit('activate')
+        else:
+            raise ValueError('wrong state')
 
     dialog.destroy()
 
@@ -185,13 +195,13 @@ def create_win():
 
 def create_menu():
     start = Gtk.ImageMenuItem.new_from_stock(Gtk.STOCK_MEDIA_PLAY, None)
-    start.set_label('Start activity')
+    start.set_label('Start working')
 
     stop = Gtk.ImageMenuItem.new_from_stock(Gtk.STOCK_MEDIA_PAUSE, None)
-    stop.set_label('Pause')
+    stop.set_label('Start break')
 
     off = Gtk.ImageMenuItem.new_from_stock(Gtk.STOCK_MEDIA_STOP, None)
-    off.set_label('Disable')
+    off.set_label('Disable program')
 
     target = Gtk.ImageMenuItem.new_from_stock(Gtk.STOCK_OK, None)
     target.set_label('Change target')
@@ -225,7 +235,7 @@ def create_menu():
 
 
 def get_tooltip(g):
-    if g.start.value is None:
+    if not g.start.value:
         return ('<b>Wavelog is disabled</b>')
 
     duration = time.strftime('%H:%M', time.gmtime(time.time() - g.start.value))
@@ -258,7 +268,7 @@ def update_ui(g):
         duration_sec = int(time.time() - g.start.value)
     duration = time.gmtime(duration_sec)
 
-    if g.start.value is None:
+    if not g.start.value:
         g.menu.child_off.hide()
         g.menu.child_start.hide()
         g.menu.child_stop.hide()
@@ -274,7 +284,7 @@ def update_ui(g):
         g.menu.child_start.show()
         g.tray.set_from_stock(Gtk.STOCK_MEDIA_PAUSE)
 
-    if g.start.value is None:
+    if not g.start.value:
         duration_text = ''
         target_text = 'OFF'
     else:
@@ -357,7 +367,7 @@ def connect_db(conf):
 
 
 def save_log(g):
-    if g.start.value is None:
+    if not g.start.value:
         return
 
     cur = g.db.cursor()
@@ -411,9 +421,9 @@ def do_action(g, action):
     if action == 'target':
         g.menu.child_target.emit('activate')
     elif action == 'toggle-active':
-        if g.start.value is None:
+        if not g.start.value:
             return False
-        toggle_active(g, not g.active.value)
+        set_activity(g, not g.active.value)
     elif action == 'disable':
         g.menu.child_off.emit('activate')
     elif action == 'quit':
