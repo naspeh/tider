@@ -2,6 +2,7 @@ import argparse
 import os
 import socket
 import sqlite3
+import subprocess
 import time
 from collections import namedtuple
 from threading import Thread
@@ -356,7 +357,7 @@ def connect_db(conf):
                 `target` varchar(255) NOT NULL,
                 `started` TEXT,
                 `ended` TEXT,
-                `duration` REAL,
+                `duration` INTEGER,
                 `is_active` INTEGER,
                 UNIQUE (target, started)
             )
@@ -372,7 +373,7 @@ def save_log(g):
 
     cur = g.db.cursor()
     target = g.target.value
-    duration = time.time() - g.start.value
+    duration = int(time.time() - g.start.value)
     started = time.strftime('%Y-%m-%d %H:%M:%S', time.gmtime(g.start.value))
     ended = time.strftime('%Y-%m-%d %H:%M:%S', time.gmtime())
     is_active = 1 if g.active.value else 0
@@ -435,12 +436,21 @@ def main(args):
         wavelog()
         return
 
+    conf = get_config()
     parser = argparse.ArgumentParser()
-    parser.add_argument(
-        '-a', '--action', help='choice action',
+    subs = parser.add_subparsers()
+
+    sub_do = subs.add_parser('do', help='apply action')
+    sub_do.add_argument(
+        'action', help='choice action',
         choices=['target', 'toggle-active', 'disable', 'quit']
     )
-    args = parser.parse_args(args)
+    sub_do.set_defaults(func=lambda: send_action(args.action))
 
-    if args.action:
-        send_action(args.action)
+    sub_db = subs.add_parser('db', help='enter to sqlite session')
+    sub_db.set_defaults(func=lambda: (
+        subprocess.check_call('sqlite3 {}'.format(conf.db_path), shell=True)
+    ))
+
+    args = parser.parse_args(args)
+    args.func()
