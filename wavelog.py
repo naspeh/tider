@@ -12,16 +12,17 @@ from gi.repository import Gdk, Gtk, GObject
 
 GObject.threads_init()
 Context = namedtuple('Context', 'conf db start active target win tray menu')
-Config = namedtuple('Config', 'timeout sock_path db_path img_path')
+Conf = namedtuple('Conf', 'timeout sock_path db_path img_path min_duration')
 
 
 def get_config():
     app_dir = os.path.join(os.path.dirname(__file__), 'var') + '/'
-    return Config(
+    return Conf(
         timeout=500,
         sock_path=app_dir + 'channel.sock',
         db_path=app_dir + 'log.db',
-        img_path=app_dir + 'win.png'
+        img_path=app_dir + 'win.png',
+        min_duration=20  # in seconds
     )
 
 
@@ -93,7 +94,7 @@ def toggle_win(widget, win):
         win.show_all()
 
 
-def set_activity(g, active, target=None):
+def set_activity(g, active, target=None, new=True):
     assert active in [False, True]
 
     if not target:
@@ -102,8 +103,10 @@ def set_activity(g, active, target=None):
     if g.start.value and target == g.target.value and active == g.active.value:
         return
 
-    save_log(g)
-    g.start.value = time.time()
+    if new:
+        save_log(g)
+        g.start.value = time.time()
+
     g.target.value = target
     g.active.value = active
     update_ui(g)
@@ -115,27 +118,24 @@ def change_target(widget, g):
     press_enter = lambda w, e: (
         e.keyval == Gdk.KEY_Return and dialog.response(Gtk.ResponseType.OK)
     )
+    box.connect('key-press-event', press_enter)
 
     name = Gtk.Entry()
     name.set_text(g.target.value)
     name.connect('key-press-event', press_enter)
+    break_ = Gtk.CheckButton('is a break')
     box.add(name)
+    box.add(break_)
 
     start = Gtk.RadioButton.new_from_widget(None)
-    start.set_label('start working')
-    start.connect('key-press-event', press_enter)
-    pause = Gtk.RadioButton.new_from_widget(start)
-    pause.set_label('start break')
-    pause.connect('key-press-event', press_enter)
+    start.set_label('start new')
     fix = Gtk.RadioButton.new_from_widget(start)
-    fix.set_label('fix current target')
-    fix.connect('key-press-event', press_enter)
+    fix.set_label('replace current')
     off = Gtk.RadioButton.new_from_widget(start)
     off.set_label('disable program')
-    off.connect('key-press-event', press_enter)
-    box.add(start)
-    box.add(pause)
     if g.start.value:
+        box.add(Gtk.HSeparator())
+        box.add(start)
         box.add(fix)
         box.add(off)
 
@@ -148,12 +148,11 @@ def change_target(widget, g):
 
     if response == Gtk.ResponseType.OK:
         target = name.get_text().strip()
+        active = not break_.get_active()
         if start.get_active():
-            set_activity(g, True, target=target)
-        elif pause.get_active():
-            set_activity(g, False, target=target)
+            set_activity(g, active, target=target)
         elif fix.get_active():
-            g.target.value = target
+            set_activity(g, active, target=target, new=False)
         elif off.get_active():
             g.menu.child_off.emit('activate')
         else:
@@ -368,9 +367,12 @@ def save_log(g):
     if not g.start.value:
         return
 
+    duration = int(time.time() - g.start.value)
+    if duration < g.conf.min_duration:
+        return
+
     cur = g.db.cursor()
     target = g.target.value
-    duration = int(time.time() - g.start.value)
     started = time.strftime('%Y-%m-%d %H:%M:%S', time.gmtime(g.start.value))
     ended = time.strftime('%Y-%m-%d %H:%M:%S', time.gmtime())
     is_active = 1 if g.active.value else 0
