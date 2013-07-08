@@ -457,9 +457,9 @@ def get_report(conf, interval=None):
     working_dict = dict(working)
 
     if interval[0] == interval[1]:
-        result = ['Statistics for {}'.format(interval[0])]
+        result = ['Report for {}'.format(interval[0])]
     else:
-        result = ['Statistics from {} to {}'.format(*interval)]
+        result = ['Report from {} to {}'.format(*interval)]
 
     result += [
         '\n'
@@ -514,16 +514,19 @@ def main(args):
 
     sub_db = subs.add_parser('db', help='enter to sqlite session')
     sub_db.set_defaults(func=lambda: (
-        subprocess.check_call('sqlite3 {}'.format(conf.db_path), shell=True)
+        subprocess.call('sqlite3 {}'.format(conf.db_path), shell=True)
     ))
 
     sub_report = subs.add_parser('report', aliases=['re'], help='print report')
     sub_report.set_defaults(func=lambda: print_report(conf, args))
     sub_report.add_argument(
         '-i', '--interval',
-        help='date interval in format: YYYY-MM-DD or YYYY-MM-DD:YYYY-MM-DD',
-        type=lambda v: [time.strptime(i, '%Y-%m-%d') for i in v.split(':', 1)]
+        help='date interval as "YYYYMMDD" or "YYYYMMDD-YYYYMMDD"',
+        type=lambda v: [time.strptime(i, '%Y%m%d') for i in v.split('-', 1)]
     )
 
     args = parser.parse_args(args)
-    args.func()
+    try:
+        args.func()
+    except KeyboardInterrupt:
+        raise SystemExit()
