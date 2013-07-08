@@ -474,7 +474,7 @@ def get_report(conf, interval=None):
     ]
 
     if working:
-        result += ['\nWorking time with breaks by target:']
+        result += ['\nWorking time with breaks:']
         for target, dur in working:
             pause = pauses_dict.pop(target, 0)
             line = '  {}: {}'.format(target, str_secs(dur))
@@ -483,7 +483,7 @@ def get_report(conf, interval=None):
             result += [line]
 
     if pauses_dict:
-        result += ['\nBreaks only by target:']
+        result += ['\nBreaks only:']
         for target, dur in pauses:
             if target not in pauses_dict:
                 continue
