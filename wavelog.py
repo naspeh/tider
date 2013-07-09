@@ -159,13 +159,13 @@ def change_target(widget, g):
     start = Gtk.RadioButton.new_from_widget(None)
     start.set_label('start new')
     fix = Gtk.RadioButton.new_from_widget(start)
-    fix.set_label('replace current')
+    fix.set_label('edit current')
     off = Gtk.RadioButton.new_from_widget(start)
-    off.set_label('disable program')
+    off.set_label('switch off')
     if g.start.value:
-        box.add(Gtk.HSeparator())
         box.add(start)
         box.add(fix)
+        box.add(Gtk.HSeparator())
         box.add(off)
 
     dialog.add_buttons(
@@ -188,16 +188,6 @@ def change_target(widget, g):
             raise ValueError('wrong state')
 
     dialog.destroy()
-
-
-def show_about(widget):
-    about = Gtk.AboutDialog()
-    about.set_destroy_with_parent(True)
-    about.set_icon_name('Wavelog')
-    about.set_name('Wavelog')
-    about.set_version('alfa')
-    about.run()
-    about.destroy()
 
 
 def create_win():
@@ -225,7 +215,7 @@ def create_menu():
     stop.set_label('Start break')
 
     off = Gtk.ImageMenuItem.new_from_stock(Gtk.STOCK_MEDIA_STOP, None)
-    off.set_label('Disable program')
+    off.set_label('Switch off')
 
     target = Gtk.ImageMenuItem.new_from_stock(Gtk.STOCK_OK, None)
     target.set_label('Set activity')
@@ -233,10 +223,6 @@ def create_menu():
 
     separator = Gtk.SeparatorMenuItem()
     separator.show()
-
-    about = Gtk.ImageMenuItem.new_from_stock(Gtk.STOCK_ABOUT, None)
-    about.connect('activate', show_about)
-    about.show()
 
     quit = Gtk.ImageMenuItem.new_from_stock(Gtk.STOCK_QUIT, None)
     quit.show()
@@ -247,7 +233,6 @@ def create_menu():
     menu.append(stop)
     menu.append(off)
     menu.append(separator)
-    menu.append(about)
     menu.append(quit)
 
     menu.child_start = start
