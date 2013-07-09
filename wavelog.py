@@ -51,10 +51,10 @@ def wavelog():
         tray=Gtk.StatusIcon(),
     )
 
-    g.win.connect('destroy', lambda x: main_quit(g))
-    g.win.connect('delete_event', lambda x, y: main_quit(g))
+    g.win.connect('destroy', lambda x: Gtk.main_quit())
+    g.win.connect('delete_event', lambda x, y: Gtk.main_quit())
 
-    g.menu.child_quit.connect('activate', lambda x: main_quit(g))
+    g.menu.child_quit.connect('activate', lambda x: Gtk.main_quit())
     g.menu.child_off.connect('activate', disable, g)
     g.menu.child_start.connect('activate', lambda x: set_activity(g, True))
     g.menu.child_stop.connect('activate', lambda x: set_activity(g, False))
@@ -74,18 +74,13 @@ def wavelog():
     server.daemon = True
     server.start()
 
-    signal.signal(signal.SIGINT, lambda s, f: main_quit(g))
-    signal.signal(signal.SIGTERM, lambda s, f: main_quit(g))
+    signal.signal(signal.SIGINT, lambda s, f: Gtk.main_quit())
+    signal.signal(signal.SIGTERM, lambda s, f: Gtk.main_quit())
     try:
         Gtk.main()
     finally:
         save_log(g)
-
-
-def main_quit(g):
-    save_log(g)
-    Gtk.main_quit()
-    print('Wavelog closed.')
+        print('Wavelog closed.')
 
 
 def disable(widget, g):
@@ -451,7 +446,7 @@ def do_action(g, action):
     elif action == 'disable':
         g.menu.child_off.emit('activate')
     elif action == 'quit':
-        main_quit(g)
+        Gtk.main_quit()
 
 
 def send_action(conf, action):
