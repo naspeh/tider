@@ -43,7 +43,7 @@ def wavelog():
         db=connect_db(conf),
         start=Variable(),
         active=Variable(False),
-        target=Variable('Enter activity name..'),
+        target=Variable(),
         win=create_win(),
         menu=create_menu(),
         tray=Gtk.StatusIcon(),
@@ -112,6 +112,28 @@ def set_activity(g, active, target=None, new=True):
     update_ui(g)
 
 
+def get_completion(g):
+    cursor = g.db.cursor()
+    cursor.execute(
+        '''
+        SELECT DISTINCT target FROM log
+            GROUP BY target
+            ORDER BY datetime(started) DESC
+            LIMIT 20
+        '''
+    )
+    names = cursor.fetchall()
+    liststore = Gtk.ListStore(str)
+    for n in names:
+        liststore.append(n)
+    completion = Gtk.EntryCompletion(model=liststore)
+    completion.set_text_column(0)
+    completion.set_minimum_key_length(0)
+    completion.set_inline_completion(True)
+    completion.set_inline_selection(True)
+    return completion
+
+
 def change_target(widget, g):
     dialog = Gtk.Dialog('Set activity')
     box = dialog.get_content_area()
@@ -120,11 +142,12 @@ def change_target(widget, g):
     )
     box.connect('key-press-event', press_enter)
 
-    name = Gtk.Entry()
-    name.set_text(g.target.value)
+    name = Gtk.Entry(completion=get_completion(g))
+    name.set_text(g.target.value or 'Enter activity name...')
     name.connect('key-press-event', press_enter)
-    break_ = Gtk.CheckButton('is a break')
     box.add(name)
+
+    break_ = Gtk.CheckButton('is a break')
     box.add(break_)
 
     start = Gtk.RadioButton.new_from_widget(None)
