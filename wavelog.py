@@ -503,26 +503,25 @@ def get_report(conf, interval=None):
         result = ['<b>Report from {} to {}</b>'.format(*interval)]
 
     result += [
-        '\n'
-        'Total working: {}'.format(str_secs(sum(working_dict.values()))),
-        'Total breaks: {}'.format(str_secs(sum(pauses_dict.values()))),
+        '  Total working: {}'.format(str_secs(sum(working_dict.values()))),
+        '  Total breaks: {}'.format(str_secs(sum(pauses_dict.values()))),
     ]
 
     if working:
-        result += ['\nWorking time with breaks:']
+        result += ['\n  Working time with breaks:']
         for target, dur in working:
             pause = pauses_dict.pop(target, 0)
-            line = '  {}: {}'.format(target, str_secs(dur))
+            line = '    {}: {}'.format(target, str_secs(dur))
             if pause:
                 line += ' (and breaks: {})'.format(str_secs(pause))
             result += [line]
 
     if pauses_dict:
-        result += ['\nBreaks only:']
+        result += ['\n  Breaks only:']
         for target, dur in pauses:
             if target not in pauses_dict:
                 continue
-            result += ['  {}: {}'.format(target, str_secs(dur))]
+            result += ['    {}: {}'.format(target, str_secs(dur))]
     return '\n'.join(result)
 
 
