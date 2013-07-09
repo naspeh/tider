@@ -1,6 +1,7 @@
 import argparse
 import os
 import re
+import signal
 import socket
 import sqlite3
 import subprocess
@@ -74,7 +75,11 @@ def wavelog():
     server.daemon = True
     server.start()
 
-    Gtk.main()
+    signal.signal(signal.SIGINT, lambda s, f: main_quit(g))
+    try:
+        Gtk.main()
+    finally:
+        save_log(g)
 
 
 def main_quit(g):
