@@ -1,5 +1,6 @@
 import argparse
 import os
+import re
 import socket
 import sqlite3
 import subprocess
@@ -11,6 +12,7 @@ import cairo as C
 from gi.repository import Gdk, Gtk, GObject
 
 GObject.threads_init()
+Gdk.threads_init()
 Context = namedtuple('Context', 'conf db start active target win tray menu')
 Conf = namedtuple('Conf', 'timeout sock_path db_path img_path min_duration')
 
@@ -78,6 +80,7 @@ def wavelog():
 def main_quit(g):
     save_log(g)
     Gtk.main_quit()
+    print('Wavelog closed.')
 
 
 def disable(widget, g):
@@ -142,9 +145,12 @@ def change_target(widget, g):
     )
     box.connect('key-press-event', press_enter)
 
+    label = Gtk.Label(halign=Gtk.Align.START)
+    label.set_markup('<b>Activity:</b>')
     name = Gtk.Entry(completion=get_completion(g))
-    name.set_text(g.target.value or 'Enter activity name...')
+    name.set_text(g.target.value or 'Enter name...')
     name.connect('key-press-event', press_enter)
+    box.pack_start(label, True, True, 6)
     box.add(name)
 
     break_ = Gtk.CheckButton('is a break')
@@ -254,31 +260,31 @@ def create_menu():
 
 def get_tooltip(g):
     if not g.start.value:
-        return ('<b>Wavelog is disabled</b>')
-
-    duration = str_secs(time.time() - g.start.value)
-    started = time.strftime('%H:%M:%S', time.localtime(g.start.value))
-    if g.active.value:
-        result = (
-            '<b><big>Working</big></b>\n'
-            'target: <b>{target}</b>\n'
-            'started at: <b>{started}</b>\n'
-            'duration: <b>{duration}</b>'
-        ).format(
-            target=g.target.value,
-            started=started,
-            duration=duration
-        )
+        result = ('<b>Wavelog is disabled</b>')
     else:
-        result = (
-            '<b><big>Pause</big></b>\n'
-            'started at: <b>{started}</b>\n'
-            'duration: <b>{duration}</b>'
-        ).format(
-            started=started,
-            duration=duration,
-        )
-    result += '\n=================\n' + get_report(g.conf)
+        duration = str_secs(time.time() - g.start.value)
+        started = time.strftime('%H:%M:%S', time.localtime(g.start.value))
+        if g.active.value:
+            result = (
+                '<b><big>Now working</big></b>\n'
+                'target: <b>{target}</b>\n'
+                'started at: <b>{started}</b>\n'
+                'duration: <b>{duration}</b>'
+            ).format(
+                target=g.target.value,
+                started=started,
+                duration=duration
+            )
+        else:
+            result = (
+                '<b><big>Pause</big></b>\n'
+                'started at: <b>{started}</b>\n'
+                'duration: <b>{duration}</b>'
+            ).format(
+                started=started,
+                duration=duration,
+            )
+    result += '\n\n' + get_report(g.conf)
     return result
 
 
@@ -486,9 +492,9 @@ def get_report(conf, interval=None):
     working_dict = dict(working)
 
     if interval[0] == interval[1]:
-        result = ['Report for {}'.format(interval[0])]
+        result = ['<b>Report for {}</b>'.format(interval[0])]
     else:
-        result = ['Report from {} to {}'.format(*interval)]
+        result = ['<b>Report from {} to {}</b>'.format(*interval)]
 
     result += [
         '\n'
@@ -522,6 +528,7 @@ def print_report(conf, args):
         interval = [time.strftime('%Y-%m-%d', i) for i in args.interval]
 
     report = get_report(conf, interval)
+    report = re.sub(r'<[^>]+>', '', report)
     print(report)
 
 
