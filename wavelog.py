@@ -12,7 +12,6 @@ from threading import Thread
 import cairo as C
 from gi.repository import Gdk, Gtk, GObject
 
-Gdk.threads_init()
 GObject.threads_init()
 Context = namedtuple('Context', 'conf db start active target win tray menu')
 Conf = namedtuple('Conf', 'timeout sock_path db_path img_path min_duration')
