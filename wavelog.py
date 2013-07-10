@@ -24,7 +24,7 @@ Context = namedtuple('Context', (
     'conf path db start active target win tray menu'
 ))
 Conf = namedtuple('Conf', (
-    'app_dir refresh_timeout off_timeout min_duration show_win'
+    'app_dir refresh_timeout off_timeout min_duration show_win show_tray'
 ))
 Paths = namedtuple('Paths', 'sock db img stat last')
 
@@ -35,7 +35,8 @@ def get_context():
         refresh_timeout=500,  # in microseconds
         off_timeout=60,  # in seconds
         min_duration=20,  # in seconds
-        show_win=True,
+        show_win=False,
+        show_tray=False,
     )
     paths = Paths(
         sock=conf.app_dir + 'channel.sock',
@@ -68,21 +69,22 @@ def wavelog():
     g = g._replace(
         win=create_win(g),
         menu=create_menu(),
-        tray=Gtk.StatusIcon(),
+        tray=Gtk.StatusIcon(visible=g.conf.show_tray),
     )
     if last and time.time() - last > g.conf.off_timeout:
         disable(g, last=last)
 
-    g.win.connect('destroy', lambda x: Gtk.main_quit())
-    g.win.connect('delete_event', lambda x, y: Gtk.main_quit())
+    g.win.connect('destroy', lambda w: Gtk.main_quit())
+    g.win.connect('delete_event', lambda w, e: Gtk.main_quit())
+    g.win.box.connect('button-press-event', lambda w, e: change_target(g))
 
-    g.menu.child_quit.connect('activate', lambda x: Gtk.main_quit())
-    g.menu.child_off.connect('activate', lambda x: disable(g))
-    g.menu.child_start.connect('activate', lambda x: set_activity(g, True))
-    g.menu.child_stop.connect('activate', lambda x: set_activity(g, False))
-    g.menu.child_target.connect('activate', change_target, g)
+    g.menu.child_quit.connect('activate', lambda w: Gtk.main_quit())
+    g.menu.child_off.connect('activate', lambda w: disable(g))
+    g.menu.child_start.connect('activate', lambda w: set_activity(g, True))
+    g.menu.child_stop.connect('activate', lambda w: set_activity(g, False))
+    g.menu.child_target.connect('activate', lambda w: change_target(g))
 
-    g.tray.connect('activate', change_target, g)
+    g.tray.connect('activate', lambda w: change_target(g))
     g.tray.connect('popup-menu', lambda icon, button, time: (
         g.menu.popup(None, None, icon.position_menu, icon, button, time)
     ))
@@ -159,7 +161,7 @@ def get_completion(g):
     return completion
 
 
-def change_target(widget, g):
+def change_target(g):
     dialog = Gtk.Dialog('Set activity')
     box = dialog.get_content_area()
     press_enter = lambda w, e: (
@@ -214,8 +216,8 @@ def change_target(widget, g):
 
 def create_win(g):
     img = Gtk.Image()
-    vbox = Gtk.VBox()
-    vbox.pack_start(img, False, True, 0)
+    box = Gtk.EventBox()
+    box.add(img)
 
     win = Gtk.Window(
         title='Wavelog', resizable=False, decorated=False,
@@ -223,12 +225,13 @@ def create_win(g):
     )
     win.set_keep_above(True)
     win.move(960, 0)
-    win.add(vbox)
+    win.add(box)
 
     if g.conf.show_win:
         win.show_all()
 
     win.img = img
+    win.box = box
     return win
 
 
@@ -265,17 +268,12 @@ def create_menu():
     menu.child_off = off
     menu.child_target = target
     menu.child_quit = quit
+
+    menu.popup_default = lambda: menu.popup(None, None, None, None, 1, 0)
     return menu
 
 
-def get_tooltip(g, as_pango=True, load_last=False):
-    if load_last:
-        g = get_last_state(g)[0]
-
-        if os.path.exists(g.path.stat):
-            with open(g.path.stat, 'r') as f:
-                return f.read()
-
+def _get_tooltip(g):
     if not g.start.value:
         result = ('<b>Wavelog is disabled</b>')
     else:
@@ -306,11 +304,24 @@ def get_tooltip(g, as_pango=True, load_last=False):
         .format(str_secs(get_last_working(g)))
     )
     result = '\n\n'.join([result, last_working, get_report(g)])
-    if not as_pango:
-        result = re.sub(r'<[^>]+>', '', result)
 
     with open(g.path.stat, 'w') as f:
         f.write(result)
+    return result
+
+
+def get_tooltip(g, as_pango=True, load_last=False):
+    if load_last:
+        g = get_last_state(g)[0]
+
+        if os.path.exists(g.path.stat):
+            with open(g.path.stat, 'r') as f:
+                result = f.read()
+    else:
+        result = _get_tooltip(g)
+
+    if not as_pango:
+        result = re.sub(r'<[^>]+>', '', result)
     return result
 
 
@@ -387,8 +398,10 @@ def update_ui(g):
     ctx.stroke()
 
     src.write_to_png(g.path.img)
-    pixbuf = Gdk.pixbuf_get_from_surface(src, 0, 0, max_w, max_h)
-    g.win.img.set_from_pixbuf(pixbuf)
+    if g.conf.show_win:
+        #pixbuf = Gdk.pixbuf_get_from_surface(src, 0, 0, max_w, max_h)
+        #g.win.img.set_from_pixbuf(pixbuf)
+        g.win.img.set_from_file(g.path.img)
     g.tray.set_tooltip_markup(get_tooltip(g))
 
     with open(g.path.last, 'wb') as f:
@@ -498,7 +511,7 @@ def do_action(g, action):
     elif action == 'quit':
         Gtk.main_quit()
     elif action == 'menu':
-        g.menu.popup(None, None, None, None, 0, 0)
+        g.menu.popup_default()
 
 
 def send_action(g, action):
