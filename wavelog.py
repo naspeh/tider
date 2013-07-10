@@ -39,8 +39,8 @@ def get_context():
         stat=conf.app_dir + 'stat.txt',
         last=conf.app_dir + 'last.txt',
     )
-    ctx = Context(*([None] * len(Context._fields)))
-    return ctx._replace(
+    g = Context(*([None] * len(Context._fields)))
+    return g._replace(
         conf=conf,
         path=paths,
         db=connect_db(paths.db),
@@ -59,7 +59,7 @@ class Variable:
 
 def wavelog():
     g = get_context()
-    g, last = get_last(g)
+    g, last = get_last_state(g)
     g = g._replace(
         win=create_win(g),
         menu=create_menu(),
@@ -207,7 +207,7 @@ def change_target(widget, g):
     dialog.destroy()
 
 
-def create_win(ctx):
+def create_win(g):
     img = Gtk.Image()
     vbox = Gtk.VBox()
     vbox.pack_start(img, False, True, 0)
@@ -220,7 +220,7 @@ def create_win(ctx):
     win.move(960, 0)
     win.add(vbox)
 
-    if ctx.conf.show_win:
+    if g.conf.show_win:
         win.show_all()
 
     win.img = img
@@ -263,7 +263,14 @@ def create_menu():
     return menu
 
 
-def get_tooltip(g):
+def get_tooltip(g, as_pango=True, load_last=False):
+    if load_last:
+        g = get_last_state(g)[0]
+
+        if os.path.exists(g.path.stat):
+            with open(g.path.stat, 'r') as f:
+                return f.read()
+
     if not g.start.value:
         result = ('<b>Wavelog is disabled</b>')
     else:
@@ -271,10 +278,10 @@ def get_tooltip(g):
         started = time.strftime('%H:%M:%S', time.localtime(g.start.value))
         if g.active.value:
             result = (
-                '<b><big>Now working</big></b>\n'
-                'target: <b>{target}</b>\n'
-                'started at: <b>{started}</b>\n'
-                'duration: <b>{duration}</b>'
+                '<b><big>Currently working</big></b>\n'
+                '  target: <b>{target}</b>\n'
+                '  started at: <b>{started}</b>\n'
+                '  duration: <b>{duration}</b>'
             ).format(
                 target=g.target.value,
                 started=started,
@@ -282,14 +289,16 @@ def get_tooltip(g):
             )
         else:
             result = (
-                '<b><big>Pause</big></b>\n'
-                'started at: <b>{started}</b>\n'
-                'duration: <b>{duration}</b>'
+                '<b><big>Currently break</big></b>\n'
+                '  started at: <b>{started}</b>\n'
+                '  duration: <b>{duration}</b>'
             ).format(
                 started=started,
                 duration=duration,
             )
     result += '\n\n' + get_report(g)
+    if not as_pango:
+        result = re.sub(r'<[^>]+>', '', result)
     return result
 
 
@@ -377,7 +386,7 @@ def update_ui(g):
     return True
 
 
-def get_last(g):
+def get_last_state(g):
     target, active, start, last = None, False, None, None
     if os.path.exists(g.path.last):
         with open(g.path.last, 'rb') as f:
@@ -480,8 +489,8 @@ def do_action(g, action):
         g.menu.popup(None, None, None, None, 0, 0)
 
 
-def send_action(ctx, action):
-    sockfile = ctx.path.sock
+def send_action(g, action):
+    sockfile = g.path.sock
     s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
     s.connect(sockfile)
     s.send(action.encode())
@@ -498,17 +507,13 @@ def str_secs(duration):
     return result
 
 
-def get_report(ctx, interval=None, as_pango=True, cached=False):
-    if not interval and cached and os.path.exists(ctx.path.stat):
-        with open(ctx.path.stat, 'r') as f:
-            return f.read()
-
+def get_report(g, interval=None, as_pango=True, cached=False):
     if not interval:
         interval = [time.strftime('%Y-%m-%d', time.localtime())]
     if len(interval) == 1:
         interval = interval * 2
 
-    cursor = ctx.db.cursor()
+    cursor = g.db.cursor()
     duration_sql = lambda is_active: cursor.execute(
         'SELECT target, SUM(duration) FROM log'
         '   WHERE is_active=? AND date(started) BETWEEN date(?) AND date(?)'
@@ -552,20 +557,19 @@ def get_report(ctx, interval=None, as_pango=True, cached=False):
             result += ['    {}: {}'.format(target, str_secs(dur))]
 
     result = '\n'.join(result)
-    if not as_pango:
-        result = re.sub(r'<[^>]+>', '', result)
     return result
 
 
-def print_report(ctx, args):
+def print_report(g, args):
     interval = None
     if args.interval:
         if len(args.interval) == 2 and args.interval[0] > args.interval[1]:
             raise SystemExit('Wrong interval: second date less than first')
         interval = [time.strftime('%Y-%m-%d', i) for i in args.interval]
 
-    report = get_report(ctx, interval, as_pango=False)
-    print(report)
+    result = get_report(g, interval)
+    result = re.sub(r'<[^>]+>', '', result)
+    print(result)
 
 
 def main(args=None):
@@ -576,7 +580,7 @@ def main(args=None):
         wavelog()
         return
 
-    ctx = get_context()
+    g = get_context()
     parser = argparse.ArgumentParser()
     subs = parser.add_subparsers()
 
@@ -585,15 +589,15 @@ def main(args=None):
         'action', help='choice action',
         choices=['target', 'menu', 'toggle-active', 'disable', 'quit']
     )
-    sub_do.set_defaults(func=lambda: send_action(ctx, args.action))
+    sub_do.set_defaults(func=lambda: send_action(g, args.action))
 
     sub_db = subs.add_parser('db', help='enter to sqlite session')
     sub_db.set_defaults(func=lambda: (
-        subprocess.call('sqlite3 {}'.format(ctx.path.db), shell=True)
+        subprocess.call('sqlite3 {}'.format(g.path.db), shell=True)
     ))
 
     sub_report = subs.add_parser('report', aliases=['re'], help='print report')
-    sub_report.set_defaults(func=lambda: print_report(ctx, args))
+    sub_report.set_defaults(func=lambda: print_report(g, args))
     sub_report.add_argument(
         '-i', '--interval',
         help='date interval as "YYYYMMDD" or "YYYYMMDD-YYYYMMDD"',
@@ -605,7 +609,7 @@ def main(args=None):
     )
     sub_xfce4.set_defaults(func=lambda: print(
         '<img>{}</img>\n<tool>{}</tool>'
-        .format(ctx.path.img, get_report(ctx, as_pango=False, cached=True))
+        .format(g.path.img, get_tooltip(g, as_pango=False, load_last=True))
         + (
             '\n<click>python {} do {}</click>'.format(__file__, args.click)
             if args.click else ''
