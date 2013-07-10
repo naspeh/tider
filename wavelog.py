@@ -14,7 +14,7 @@ from gi.repository import Gdk, Gtk, GObject
 
 GObject.threads_init()
 Context = namedtuple('Context', 'conf db start active target win tray menu')
-Conf = namedtuple('Conf', 'timeout sock_path db_path img_path min_duration')
+Conf = namedtuple('Conf', 'timeout sock_path db_path min_duration')
 
 
 def get_config():
@@ -23,7 +23,6 @@ def get_config():
         timeout=500,
         sock_path=app_dir + 'channel.sock',
         db_path=app_dir + 'log.db',
-        img_path=app_dir + 'win.png',
         min_duration=20  # in seconds
     )
 
@@ -311,7 +310,6 @@ def update_ui(g):
     timer_w = max_h * 1.5
     color = (0.6, 0.9, 0.6) if g.active.value else (0.7, 0.7, 0.7)
 
-    icon_path = g.conf.img_path
     src = C.ImageSurface(C.FORMAT_ARGB32, max_w, max_h)
     ctx = C.Context(src)
 
@@ -345,9 +343,9 @@ def update_ui(g):
     ctx.line_to(timer_w - duration_w, max_h - line_h / 2)
     ctx.stroke()
 
-    src.write_to_png(icon_path)
-    #tray.set_from_file(icon_path)
-    g.win.img.set_from_file(icon_path)
+    pixbuf = Gdk.pixbuf_get_from_surface(src, 0, 0, max_w, max_h)
+    g.win.img.set_from_pixbuf(pixbuf)
+    #g.tray.set_from_pixbuf(pixbuf)
     g.tray.set_tooltip_markup(get_tooltip(g))
     return True
 
