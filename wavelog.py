@@ -14,21 +14,30 @@ import cairo as C
 from gi.repository import Gdk, Gtk, GObject
 
 GObject.threads_init()
-Context = namedtuple('Context', 'conf db start active target win tray menu')
-Conf = namedtuple('Conf', (
-    'timeout sock_path db_path img_path stat_path min_duration'
+Context = namedtuple('Context', (
+    'conf path db start active target win tray menu'
 ))
+Conf = namedtuple('Conf', 'timeout min_duration app_dir')
+Paths = namedtuple('Paths', 'sock db img stat')
 
 
-def get_config():
-    app_dir = os.path.join(os.path.dirname(__file__), 'var') + '/'
-    return Conf(
+def get_context():
+    conf = Conf(
         timeout=500,
-        sock_path=app_dir + 'channel.sock',
-        db_path=app_dir + 'log.db',
-        img_path=app_dir + 'status.png',
-        stat_path=app_dir + 'stat.txt',
+        app_dir=os.path.join(os.path.dirname(__file__), 'var') + '/',
         min_duration=20  # in seconds
+    )
+    paths = Paths(
+        sock=conf.app_dir + 'channel.sock',
+        db=conf.app_dir + 'log.db',
+        img=conf.app_dir + 'status.png',
+        stat=conf.app_dir + 'stat.txt',
+    )
+    ctx = Context(*([None] * len(Context._fields)))
+    return ctx._replace(
+        conf=conf,
+        path=paths,
+        db=connect_db(paths.db),
     )
 
 
@@ -43,10 +52,7 @@ class Variable:
 
 
 def wavelog():
-    conf = get_config()
-    g = Context(
-        conf=conf,
-        db=connect_db(conf),
+    g = get_context()._replace(
         start=Variable(),
         active=Variable(False),
         target=Variable(),
@@ -273,7 +279,7 @@ def get_tooltip(g):
                 started=started,
                 duration=duration,
             )
-    result += '\n\n' + get_report(g.conf)
+    result += '\n\n' + get_report(g)
     return result
 
 
@@ -349,15 +355,15 @@ def update_ui(g):
     ctx.line_to(timer_w - duration_w, max_h - line_h / 2)
     ctx.stroke()
 
-    src.write_to_png(g.conf.img_path)
+    src.write_to_png(g.path.img)
     pixbuf = Gdk.pixbuf_get_from_surface(src, 0, 0, max_w, max_h)
     g.win.img.set_from_pixbuf(pixbuf)
     g.tray.set_tooltip_markup(get_tooltip(g))
     return True
 
 
-def connect_db(conf):
-    db = sqlite3.connect(conf.db_path)
+def connect_db(db_path):
+    db = sqlite3.connect(db_path)
     cur = db.cursor()
     cur.execute(
         'SELECT name FROM sqlite_master WHERE type="table" AND name="log"'
@@ -407,7 +413,7 @@ def save_log(g):
 
 
 def run_server(g):
-    sockfile = g.conf.sock_path
+    sockfile = g.path.sock
     if os.path.exists(sockfile):
         os.remove(sockfile)
     s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
@@ -440,8 +446,8 @@ def do_action(g, action):
         g.menu.popup(None, None, None, None, 0, 0)
 
 
-def send_action(conf, action):
-    sockfile = conf.sock_path
+def send_action(ctx, action):
+    sockfile = ctx.path.sock
     s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
     s.connect(sockfile)
     s.send(action.encode())
@@ -458,9 +464,9 @@ def str_secs(duration):
     return result
 
 
-def get_report(conf, interval=None, as_pango=True, cached=False):
-    if not interval and cached and os.path.exists(conf.stat_path):
-        with open(conf.stat_path, 'r') as f:
+def get_report(ctx, interval=None, as_pango=True, cached=False):
+    if not interval and cached and os.path.exists(ctx.path.stat):
+        with open(ctx.path.stat, 'r') as f:
             return f.read()
 
     if not interval:
@@ -468,8 +474,7 @@ def get_report(conf, interval=None, as_pango=True, cached=False):
     if len(interval) == 1:
         interval = interval * 2
 
-    db = connect_db(conf)
-    cursor = db.cursor()
+    cursor = ctx.db.cursor()
     duration_sql = lambda is_active: cursor.execute(
         'SELECT target, SUM(duration) FROM log'
         '   WHERE is_active=? AND date(started) BETWEEN date(?) AND date(?)'
@@ -518,14 +523,14 @@ def get_report(conf, interval=None, as_pango=True, cached=False):
     return result
 
 
-def print_report(conf, args):
+def print_report(ctx, args):
     interval = None
     if args.interval:
         if len(args.interval) == 2 and args.interval[0] > args.interval[1]:
             raise SystemExit('Wrong interval: second date less than first')
         interval = [time.strftime('%Y-%m-%d', i) for i in args.interval]
 
-    report = get_report(conf, interval, as_pango=False)
+    report = get_report(ctx, interval, as_pango=False)
     print(report)
 
 
@@ -537,7 +542,7 @@ def main(args=None):
         wavelog()
         return
 
-    conf = get_config()
+    ctx = get_context()
     parser = argparse.ArgumentParser()
     subs = parser.add_subparsers()
 
@@ -546,15 +551,15 @@ def main(args=None):
         'action', help='choice action',
         choices=['target', 'menu', 'toggle-active', 'disable', 'quit']
     )
-    sub_do.set_defaults(func=lambda: send_action(conf, args.action))
+    sub_do.set_defaults(func=lambda: send_action(ctx, args.action))
 
     sub_db = subs.add_parser('db', help='enter to sqlite session')
     sub_db.set_defaults(func=lambda: (
-        subprocess.call('sqlite3 {}'.format(conf.db_path), shell=True)
+        subprocess.call('sqlite3 {}'.format(ctx.path.db), shell=True)
     ))
 
     sub_report = subs.add_parser('report', aliases=['re'], help='print report')
-    sub_report.set_defaults(func=lambda: print_report(conf, args))
+    sub_report.set_defaults(func=lambda: print_report(ctx, args))
     sub_report.add_argument(
         '-i', '--interval',
         help='date interval as "YYYYMMDD" or "YYYYMMDD-YYYYMMDD"',
@@ -566,7 +571,7 @@ def main(args=None):
     )
     sub_xfce4.set_defaults(func=lambda: print(
         '<img>{}</img><tool>{}</tool>'
-        .format(conf.img_path, get_report(conf, as_pango=False, cached=True))
+        .format(ctx.path.img, get_report(ctx, as_pango=False, cached=True))
     ))
 
     args = parser.parse_args(args)
