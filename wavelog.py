@@ -576,9 +576,17 @@ def main(args=None):
         'xfce4', help='command for xfce4-genmon-plugin'
     )
     sub_xfce4.set_defaults(func=lambda: print(
-        '<img>{}</img><tool>{}</tool>'
+        '<img>{}</img>\n<tool>{}</tool>'
         .format(ctx.path.img, get_report(ctx, as_pango=False, cached=True))
+        + (
+            '\n<click>python {} do {}</click>'.format(__file__, args.click)
+            if args.click else ''
+        )
     ))
+    sub_xfce4.add_argument(
+        '-c', '--click', choices = ['menu', 'target'],
+        help='show (menu|targer dialog) on click'
+    )
 
     args = parser.parse_args(args)
     try:
