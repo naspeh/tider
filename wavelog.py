@@ -327,7 +327,6 @@ def update_ui(g):
     ctx.fill()
 
     ctx.set_source_rgb(*font_rgb)
-    #ctx.select_font_face('Mono', C.FONT_SLANT_NORMAL, C.FONT_WEIGHT_BOLD)
     ctx.set_font_size(font_h)
 
     text_w, text_h = ctx.text_extents(duration_text)[2:4]
@@ -350,7 +349,6 @@ def update_ui(g):
     src.write_to_png(g.conf.img_path)
     pixbuf = Gdk.pixbuf_get_from_surface(src, 0, 0, max_w, max_h)
     g.win.img.set_from_pixbuf(pixbuf)
-    #g.tray.set_from_pixbuf(pixbuf)
     g.tray.set_tooltip_markup(get_tooltip(g))
     return True
 
@@ -555,7 +553,8 @@ def main(args=None):
         'xfce4', help='print command for xfce4-genmon-plugin'
     )
     sub_xfce4.set_defaults(func=lambda: print(
-        'echo "<img>{}</img><tool>Wavelog</tool>"'.format(conf.img_path)
+        'echo "<img>{}</img><tool>Wavelog status</tool>"'
+        .format(conf.img_path)
     ))
 
     args = parser.parse_args(args)
