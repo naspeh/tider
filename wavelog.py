@@ -5,6 +5,7 @@ import signal
 import socket
 import sqlite3
 import subprocess
+import sys
 import time
 from collections import namedtuple
 from threading import Thread
@@ -14,7 +15,7 @@ from gi.repository import Gdk, Gtk, GObject
 
 GObject.threads_init()
 Context = namedtuple('Context', 'conf db start active target win tray menu')
-Conf = namedtuple('Conf', 'timeout sock_path db_path min_duration')
+Conf = namedtuple('Conf', 'timeout sock_path db_path img_path min_duration')
 
 
 def get_config():
@@ -23,6 +24,7 @@ def get_config():
         timeout=500,
         sock_path=app_dir + 'channel.sock',
         db_path=app_dir + 'log.db',
+        img_path=app_dir + 'status.png',
         min_duration=20  # in seconds
     )
 
@@ -78,7 +80,7 @@ def wavelog():
     try:
         Gtk.main()
     finally:
-        save_log(g)
+        disable(None, g)
         print('Wavelog closed.')
 
 
@@ -192,7 +194,7 @@ def change_target(widget, g):
 def create_win():
     img = Gtk.Image()
     vbox = Gtk.VBox()
-    vbox.pack_start(img, False, True, 1)
+    vbox.pack_start(img, False, True, 0)
 
     win = Gtk.Window(
         title='Wavelog', resizable=False, decorated=False,
@@ -313,12 +315,14 @@ def update_ui(g):
     src = C.ImageSurface(C.FORMAT_ARGB32, max_w, max_h)
     ctx = C.Context(src)
 
-    ctx.set_line_width(0.5)
-    ctx.set_source_rgb(*color)
+    ctx.set_source_rgb(1, 1, 1)
+    ctx.rectangle(0, 0, max_w, max_h)
+    ctx.fill()
 
+    ctx.set_line_width(1)
+    ctx.set_source_rgb(*color)
     ctx.rectangle(0, 0, max_w, max_h)
     ctx.stroke()
-
     ctx.rectangle(0, 0, timer_w + padding / 2, max_h)
     ctx.fill()
 
@@ -343,6 +347,7 @@ def update_ui(g):
     ctx.line_to(timer_w - duration_w, max_h - line_h / 2)
     ctx.stroke()
 
+    src.write_to_png(g.conf.img_path)
     pixbuf = Gdk.pixbuf_get_from_surface(src, 0, 0, max_w, max_h)
     g.win.img.set_from_pixbuf(pixbuf)
     #g.tray.set_from_pixbuf(pixbuf)
@@ -514,7 +519,10 @@ def print_report(conf, args):
     print(report)
 
 
-def main(args):
+def main(args=None):
+    if args is None:
+        args = sys.argv[1:]
+
     if not args:
         wavelog()
         return
@@ -543,8 +551,19 @@ def main(args):
         type=lambda v: [time.strptime(i, '%Y%m%d') for i in v.split('-', 1)]
     )
 
+    sub_xfce4 = subs.add_parser(
+        'xfce4', help='print command for xfce4-genmon-plugin'
+    )
+    sub_xfce4.set_defaults(func=lambda: print(
+        'echo "<img>{}</img><tool>Wavelog</tool>"'.format(conf.img_path)
+    ))
+
     args = parser.parse_args(args)
     try:
         args.func()
     except KeyboardInterrupt:
         raise SystemExit()
+
+
+if __name__ == '__main__':
+    main()
