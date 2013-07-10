@@ -15,7 +15,9 @@ from gi.repository import Gdk, Gtk, GObject
 
 GObject.threads_init()
 Context = namedtuple('Context', 'conf db start active target win tray menu')
-Conf = namedtuple('Conf', 'timeout sock_path db_path img_path min_duration')
+Conf = namedtuple('Conf', (
+    'timeout sock_path db_path img_path stat_path min_duration'
+))
 
 
 def get_config():
@@ -25,6 +27,7 @@ def get_config():
         sock_path=app_dir + 'channel.sock',
         db_path=app_dir + 'log.db',
         img_path=app_dir + 'status.png',
+        stat_path=app_dir + 'stat.txt',
         min_duration=20  # in seconds
     )
 
@@ -453,7 +456,11 @@ def str_secs(duration):
     return result
 
 
-def get_report(conf, interval=None):
+def get_report(conf, interval=None, as_pango=True, cached=False):
+    if not interval and cached and os.path.exists(conf.stat_path):
+        with open(conf.stat_path, 'r') as f:
+            return f.read()
+
     if not interval:
         interval = [time.strftime('%Y-%m-%d', time.localtime())]
     if len(interval) == 1:
@@ -478,9 +485,9 @@ def get_report(conf, interval=None):
     working_dict = dict(working)
 
     if interval[0] == interval[1]:
-        result = ['<b>Report for {}</b>'.format(interval[0])]
+        result = ['<b>Statistics for {}</b>'.format(interval[0])]
     else:
-        result = ['<b>Report from {} to {}</b>'.format(*interval)]
+        result = ['<b>Statistics from {} to {}</b>'.format(*interval)]
 
     result += [
         '  Total working: {}'.format(str_secs(sum(working_dict.values()))),
@@ -502,7 +509,11 @@ def get_report(conf, interval=None):
             if target not in pauses_dict:
                 continue
             result += ['    {}: {}'.format(target, str_secs(dur))]
-    return '\n'.join(result)
+
+    result = '\n'.join(result)
+    if not as_pango:
+        result = re.sub(r'<[^>]+>', '', result)
+    return result
 
 
 def print_report(conf, args):
@@ -512,8 +523,7 @@ def print_report(conf, args):
             raise SystemExit('Wrong interval: second date less than first')
         interval = [time.strftime('%Y-%m-%d', i) for i in args.interval]
 
-    report = get_report(conf, interval)
-    report = re.sub(r'<[^>]+>', '', report)
+    report = get_report(conf, interval, as_pango=False)
     print(report)
 
 
@@ -550,11 +560,11 @@ def main(args=None):
     )
 
     sub_xfce4 = subs.add_parser(
-        'xfce4', help='print command for xfce4-genmon-plugin'
+        'xfce4', help='command for xfce4-genmon-plugin'
     )
     sub_xfce4.set_defaults(func=lambda: print(
-        'echo "<img>{}</img><tool>Wavelog status</tool>"'
-        .format(conf.img_path)
+        '<img>{}</img><tool>{}</tool>'
+        .format(conf.img_path, get_report(conf, as_pango=False, cached=True))
     ))
 
     args = parser.parse_args(args)
