@@ -1,4 +1,5 @@
 import argparse
+import pickle
 import os
 import re
 import signal
@@ -17,14 +18,17 @@ GObject.threads_init()
 Context = namedtuple('Context', (
     'conf path db start active target win tray menu'
 ))
-Conf = namedtuple('Conf', 'app_dir timeout min_duration show_win')
+Conf = namedtuple('Conf', (
+    'app_dir refresh_timeout off_timeout min_duration show_win'
+))
 Paths = namedtuple('Paths', 'sock db img stat last')
 
 
 def get_context():
     conf = Conf(
-        timeout=500,
         app_dir=os.path.join(os.path.dirname(__file__), 'var') + '/',
+        refresh_timeout=500,  # in microseconds
+        off_timeout=60,  # in seconds
         min_duration=20,  # in seconds
         show_win=False,
     )
@@ -55,20 +59,20 @@ class Variable:
 
 def wavelog():
     g = get_context()
+    g, last = get_last(g)
     g = g._replace(
-        start=Variable(),
-        active=Variable(False),
-        target=Variable(),
         win=create_win(g),
         menu=create_menu(),
         tray=Gtk.StatusIcon(),
     )
+    if last and time.time() - last > g.conf.off_timeout:
+        disable(g, last=last)
 
     g.win.connect('destroy', lambda x: Gtk.main_quit())
     g.win.connect('delete_event', lambda x, y: Gtk.main_quit())
 
     g.menu.child_quit.connect('activate', lambda x: Gtk.main_quit())
-    g.menu.child_off.connect('activate', disable, g)
+    g.menu.child_off.connect('activate', lambda x: disable(g))
     g.menu.child_start.connect('activate', lambda x: set_activity(g, True))
     g.menu.child_stop.connect('activate', lambda x: set_activity(g, False))
     g.menu.child_target.connect('activate', change_target, g)
@@ -78,7 +82,7 @@ def wavelog():
         g.menu.popup(None, None, icon.position_menu, icon, button, time)
     ))
     GObject.timeout_add(
-        g.conf.timeout, lambda: not g.start.value or update_ui(g)
+        g.conf.refresh_timeout, lambda: not g.start.value or update_ui(g)
     )
 
     update_ui(g)
@@ -92,12 +96,12 @@ def wavelog():
     try:
         Gtk.main()
     finally:
-        disable(None, g)
+        disable(g)
         print('Wavelog closed.')
 
 
-def disable(widget, g):
-    save_log(g)
+def disable(g, last=None):
+    save_log(g, last=last)
     g.start.value = None
     g.active.value = False
     update_ui(g)
@@ -365,7 +369,26 @@ def update_ui(g):
     pixbuf = Gdk.pixbuf_get_from_surface(src, 0, 0, max_w, max_h)
     g.win.img.set_from_pixbuf(pixbuf)
     g.tray.set_tooltip_markup(get_tooltip(g))
+
+    with open(g.path.last, 'wb') as f:
+        f.write(pickle.dumps([
+            g.target.value, g.active.value, g.start.value, time.time()
+        ]))
     return True
+
+
+def get_last(g):
+    target, active, start, last = None, False, None, None
+    if os.path.exists(g.path.last):
+        with open(g.path.last, 'rb') as f:
+            target, active, start, last = pickle.load(f)
+
+    g = g._replace(
+        target=Variable(target),
+        active=Variable(active),
+        start=Variable(start)
+    )
+    return g, last
 
 
 def connect_db(db_path):
@@ -392,18 +415,21 @@ def connect_db(db_path):
     return db
 
 
-def save_log(g):
+def save_log(g, last=None):
     if not g.start.value:
         return
 
-    duration = int(time.time() - g.start.value)
+    if not last:
+        last = time.time()
+
+    duration = int(last - g.start.value)
     if duration < g.conf.min_duration:
         return
 
     cur = g.db.cursor()
     target = g.target.value
     started = time.strftime('%Y-%m-%d %H:%M:%S', time.gmtime(g.start.value))
-    ended = time.strftime('%Y-%m-%d %H:%M:%S', time.gmtime())
+    ended = time.strftime('%Y-%m-%d %H:%M:%S', time.gmtime(last))
     is_active = 1 if g.active.value else 0
     cur.execute(
         'SELECT id FROM log WHERE started = ? AND target = ?',
@@ -416,6 +442,8 @@ def save_log(g):
             [target, started, ended,  duration, is_active]
         )
         g.db.commit()
+
+    os.remove(g.path.last)
 
 
 def run_server(g):
@@ -584,7 +612,7 @@ def main(args=None):
         )
     ))
     sub_xfce4.add_argument(
-        '-c', '--click', choices = ['menu', 'target'],
+        '-c', '--click', choices=['menu', 'target'],
         help='show (menu|targer dialog) on click'
     )
 
