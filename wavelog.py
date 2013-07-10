@@ -436,6 +436,8 @@ def do_action(g, action):
         g.menu.child_off.emit('activate')
     elif action == 'quit':
         Gtk.main_quit()
+    elif action == 'menu':
+        g.menu.popup(None, None, None, None, 0, 0)
 
 
 def send_action(conf, action):
@@ -542,7 +544,7 @@ def main(args=None):
     sub_do = subs.add_parser('do', help='apply action')
     sub_do.add_argument(
         'action', help='choice action',
-        choices=['target', 'toggle-active', 'disable', 'quit']
+        choices=['target', 'menu', 'toggle-active', 'disable', 'quit']
     )
     sub_do.set_defaults(func=lambda: send_action(conf, args.action))
 
