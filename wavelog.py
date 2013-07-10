@@ -17,21 +17,23 @@ GObject.threads_init()
 Context = namedtuple('Context', (
     'conf path db start active target win tray menu'
 ))
-Conf = namedtuple('Conf', 'timeout min_duration app_dir')
-Paths = namedtuple('Paths', 'sock db img stat')
+Conf = namedtuple('Conf', 'app_dir timeout min_duration show_win')
+Paths = namedtuple('Paths', 'sock db img stat last')
 
 
 def get_context():
     conf = Conf(
         timeout=500,
         app_dir=os.path.join(os.path.dirname(__file__), 'var') + '/',
-        min_duration=20  # in seconds
+        min_duration=20,  # in seconds
+        show_win=False,
     )
     paths = Paths(
         sock=conf.app_dir + 'channel.sock',
         db=conf.app_dir + 'log.db',
         img=conf.app_dir + 'status.png',
         stat=conf.app_dir + 'stat.txt',
+        last=conf.app_dir + 'last.txt',
     )
     ctx = Context(*([None] * len(Context._fields)))
     return ctx._replace(
@@ -52,11 +54,12 @@ class Variable:
 
 
 def wavelog():
-    g = get_context()._replace(
+    g = get_context()
+    g = g._replace(
         start=Variable(),
         active=Variable(False),
         target=Variable(),
-        win=create_win(),
+        win=create_win(g),
         menu=create_menu(),
         tray=Gtk.StatusIcon(),
     )
@@ -200,7 +203,7 @@ def change_target(widget, g):
     dialog.destroy()
 
 
-def create_win():
+def create_win(ctx):
     img = Gtk.Image()
     vbox = Gtk.VBox()
     vbox.pack_start(img, False, True, 0)
@@ -212,7 +215,10 @@ def create_win():
     win.set_keep_above(True)
     win.move(960, 0)
     win.add(vbox)
-    win.show_all()
+
+    if ctx.conf.show_win:
+        win.show_all()
+
     win.img = img
     return win
 
