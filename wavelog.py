@@ -1,4 +1,5 @@
 import argparse
+import calendar
 import pickle
 import os
 import re
@@ -15,6 +16,10 @@ import cairo as C
 from gi.repository import Gdk, Gtk, GObject
 
 GObject.threads_init()
+
+SQL_DATE = '%Y-%m-%d'
+SQL_DATETIME = SQL_DATE + ' %H:%M:%S'
+
 Context = namedtuple('Context', (
     'conf path db start active target win tray menu'
 ))
@@ -30,7 +35,7 @@ def get_context():
         refresh_timeout=500,  # in microseconds
         off_timeout=60,  # in seconds
         min_duration=20,  # in seconds
-        show_win=False,
+        show_win=True,
     )
     paths = Paths(
         sock=conf.app_dir + 'channel.sock',
@@ -296,7 +301,11 @@ def get_tooltip(g, as_pango=True, load_last=False):
                 started=started,
                 duration=duration,
             )
-    result += '\n\n' + get_report(g)
+    last_working = (
+        '<b>Last working period: {}</b>'
+        .format(str_secs(get_last_working(g)))
+    )
+    result = '\n\n'.join([result, last_working, get_report(g)])
     if not as_pango:
         result = re.sub(r'<[^>]+>', '', result)
     return result
@@ -437,8 +446,8 @@ def save_log(g, last=None):
 
     cur = g.db.cursor()
     target = g.target.value
-    started = time.strftime('%Y-%m-%d %H:%M:%S', time.gmtime(g.start.value))
-    ended = time.strftime('%Y-%m-%d %H:%M:%S', time.gmtime(last))
+    started = time.strftime(SQL_DATETIME, time.gmtime(g.start.value))
+    ended = time.strftime(SQL_DATETIME, time.gmtime(last))
     is_active = 1 if g.active.value else 0
     cur.execute(
         'SELECT id FROM log WHERE started = ? AND target = ?',
@@ -507,11 +516,43 @@ def str_secs(duration):
     return result
 
 
-def get_report(g, interval=None, as_pango=True, cached=False):
+def get_last_working(g):
+    cursor = g.db.cursor()
+    cursor.execute(
+        'SELECT started, ended, duration FROM log'
+        '   WHERE date(started)=date(?) AND is_active'
+        '   ORDER BY datetime(started) DESC',
+        [time.strftime(SQL_DATE, time.gmtime())]
+    )
+
+    to_dt = lambda v: calendar.timegm(time.strptime(v, SQL_DATETIME))
+    rows = cursor.fetchall()
+    period = 0
+    if g.active.value:
+        period = time.time() - g.start.value
+        if g.start.value - to_dt(rows[0][1]) > g.conf.off_timeout:
+            return period
+
+    period += rows[0][2]
+    for i in range(1, len(rows)):
+        if to_dt(rows[i-1][0]) - to_dt(rows[i][1]) > g.conf.off_timeout:
+            break
+        period += rows[i][2]
+    return period
+
+
+def get_report(g, interval=None):
     if not interval:
-        interval = [time.strftime('%Y-%m-%d', time.localtime())]
+        interval = [time.localtime()]
     if len(interval) == 1:
         interval = interval * 2
+
+    interval_str = [time.strftime('%x', i) for i in interval]
+
+    interval_utc = [
+        time.strftime(SQL_DATE, time.gmtime(time.mktime(i)))
+        for i in interval
+    ]
 
     cursor = g.db.cursor()
     duration_sql = lambda is_active: cursor.execute(
@@ -519,7 +560,7 @@ def get_report(g, interval=None, as_pango=True, cached=False):
         '   WHERE is_active=? AND date(started) BETWEEN date(?) AND date(?)'
         '   GROUP BY target'
         '   ORDER BY 2 DESC',
-        [str(1 if is_active else 0)] + interval
+        [str(1 if is_active else 0)] + interval_utc
     )
 
     duration_sql(False)
@@ -531,9 +572,9 @@ def get_report(g, interval=None, as_pango=True, cached=False):
     working_dict = dict(working)
 
     if interval[0] == interval[1]:
-        result = ['<b>Statistics for {}</b>'.format(interval[0])]
+        result = ['<b>Statistics for {}</b>'.format(interval_str[0])]
     else:
-        result = ['<b>Statistics from {} to {}</b>'.format(*interval)]
+        result = ['<b>Statistics from {} to {}</b>'.format(*interval_str)]
 
     result += [
         '  Total working: {}'.format(str_secs(sum(working_dict.values()))),
@@ -565,7 +606,7 @@ def print_report(g, args):
     if args.interval:
         if len(args.interval) == 2 and args.interval[0] > args.interval[1]:
             raise SystemExit('Wrong interval: second date less than first')
-        interval = [time.strftime('%Y-%m-%d', i) for i in args.interval]
+        interval = args.interval
 
     result = get_report(g, interval)
     result = re.sub(r'<[^>]+>', '', result)
