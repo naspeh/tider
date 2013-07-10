@@ -308,6 +308,9 @@ def get_tooltip(g, as_pango=True, load_last=False):
     result = '\n\n'.join([result, last_working, get_report(g)])
     if not as_pango:
         result = re.sub(r'<[^>]+>', '', result)
+
+    with open(g.path.stat, 'w') as f:
+        f.write(result)
     return result
 
 
