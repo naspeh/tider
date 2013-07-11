@@ -35,7 +35,7 @@ def get_context():
         refresh_timeout=500,  # in microseconds
         off_timeout=60,  # in seconds
         min_duration=20,  # in seconds
-        show_win=False,
+        show_win=True,
         show_tray=False,
     )
     paths = Paths(
@@ -543,11 +543,16 @@ def get_last_working(g):
 
     to_dt = lambda v: calendar.timegm(time.strptime(v, SQL_DATETIME))
     rows = cursor.fetchall()
-    period = 0
     if g.active.value:
         period = time.time() - g.start.value
-        if g.start.value - to_dt(rows[0][1]) > g.conf.off_timeout:
-            return period
+    else:
+        period = 0
+
+    if not rows:
+        return period
+
+    if period and g.start.value - to_dt(rows[0][1]) > g.conf.off_timeout:
+        return period
 
     period += rows[0][2]
     for i in range(1, len(rows)):
