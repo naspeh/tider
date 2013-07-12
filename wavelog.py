@@ -24,26 +24,27 @@ Context = namedtuple('Context', (
     'conf path db start active target win tray menu'
 ))
 Conf = namedtuple('Conf', (
-    'app_dir refresh_timeout off_timeout min_duration show_win show_tray'
+    'refresh_timeout off_timeout min_duration hide_win hide_tray'
 ))
-Paths = namedtuple('Paths', 'sock db img stat last')
+Paths = namedtuple('Paths', 'root sock db img stat last')
 
 
 def get_context():
+    app_dir = os.path.join(os.path.dirname(__file__), 'var') + '/'
+    paths = Paths(
+        root=app_dir,
+        sock=app_dir + 'channel.sock',
+        db=app_dir + 'log.db',
+        img=app_dir + 'status.png',
+        stat=app_dir + 'stat.txt',
+        last=app_dir + 'last.txt',
+    )
     conf = Conf(
-        app_dir=os.path.join(os.path.dirname(__file__), 'var') + '/',
         refresh_timeout=500,  # in microseconds
         off_timeout=60,  # in seconds
         min_duration=20,  # in seconds
-        show_win=True,
-        show_tray=False,
-    )
-    paths = Paths(
-        sock=conf.app_dir + 'channel.sock',
-        db=conf.app_dir + 'log.db',
-        img=conf.app_dir + 'status.png',
-        stat=conf.app_dir + 'stat.txt',
-        last=conf.app_dir + 'last.txt',
+        hide_win=False,
+        hide_tray=True,
     )
     g = Context(*([None] * len(Context._fields)))
     return g._replace(
@@ -69,14 +70,15 @@ def wavelog():
     g = g._replace(
         win=create_win(g),
         menu=create_menu(),
-        tray=Gtk.StatusIcon(visible=g.conf.show_tray),
+        tray=Gtk.StatusIcon(visible=not g.conf.hide_tray),
     )
     if last and time.time() - last > g.conf.off_timeout:
         disable(g, last=last)
 
-    g.win.connect('destroy', lambda w: Gtk.main_quit())
-    g.win.connect('delete_event', lambda w, e: Gtk.main_quit())
-    g.win.box.connect('button-press-event', lambda w, e: change_target(g))
+    if g.win:
+        g.win.connect('destroy', lambda w: Gtk.main_quit())
+        g.win.connect('delete_event', lambda w, e: Gtk.main_quit())
+        g.win.box.connect('button-press-event', lambda w, e: change_target(g))
 
     g.menu.child_quit.connect('activate', lambda w: Gtk.main_quit())
     g.menu.child_off.connect('activate', lambda w: disable(g))
@@ -215,6 +217,9 @@ def change_target(g):
 
 
 def create_win(g):
+    if g.conf.hide_win:
+        return
+
     img = Gtk.Image()
     box = Gtk.EventBox()
     box.add(img)
@@ -226,9 +231,7 @@ def create_win(g):
     win.set_keep_above(True)
     win.move(960, 0)
     win.add(box)
-
-    if g.conf.show_win:
-        win.show_all()
+    win.show_all()
 
     win.img = img
     win.box = box
@@ -398,7 +401,7 @@ def update_ui(g):
     ctx.stroke()
 
     src.write_to_png(g.path.img)
-    if g.conf.show_win:
+    if g.win:
         #pixbuf = Gdk.pixbuf_get_from_surface(src, 0, 0, max_w, max_h)
         #g.win.img.set_from_pixbuf(pixbuf)
         g.win.img.set_from_file(g.path.img)
