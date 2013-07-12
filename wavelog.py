@@ -26,8 +26,7 @@ class _Context:
     def __init__(self, **kw):
         defaults = dict((k, None) for k in self.__slots__)
         defaults.update(kw)
-        for k, v in defaults.items():
-            setattr(self, k, v)
+        self._replace(**defaults)
 
     @property
     def _items(self):
@@ -76,23 +75,13 @@ def get_context():
         off_timeout=60,  # in seconds
         min_duration=20,  # in seconds
         hide_win=False,
-        hide_tray=True,
+        hide_tray=False,
     )
     return Context(
         conf=conf,
         path=paths,
         db=connect_db(paths.db),
     )
-
-
-class Variable:
-    __slots__ = ('value', )
-
-    def __init__(self, value=None):
-        self.value = value
-
-    def __repr__(self):
-        return 'Variable({!r})'.format(self.value)
 
 
 def wavelog():
@@ -109,7 +98,7 @@ def wavelog():
         disable(g, last=last)
 
     GObject.timeout_add(
-        g.conf.refresh_timeout, lambda: not g.start.value or update_ui(g)
+        g.conf.refresh_timeout, lambda: not g.start or update_ui(g)
     )
     update_ui(g)
 
@@ -127,8 +116,8 @@ def wavelog():
 
 def disable(g, last=None):
     save_log(g, last=last)
-    g.start.value = None
-    g.active.value = False
+    g.start = None
+    g.active = False
     update_ui(g)
 
 
@@ -136,17 +125,17 @@ def set_activity(g, active, target=None, new=True):
     assert active in [False, True]
 
     if not target:
-        target = g.target.value
+        target = g.target
 
-    if g.start.value and target == g.target.value and active == g.active.value:
+    if g.start and target == g.target and active == g.active:
         return
 
     if new:
         save_log(g)
-        g.start.value = time.time()
+        g.start = time.time()
 
-    g.target.value = target
-    g.active.value = active
+    g.target = target
+    g.active = active
     update_ui(g)
 
 
@@ -183,7 +172,7 @@ def change_target(g):
     label = Gtk.Label(halign=Gtk.Align.START)
     label.set_markup('<b>Activity:</b>')
     name = Gtk.Entry(completion=get_completion(g))
-    name.set_text(g.target.value or 'Enter name...')
+    name.set_text(g.target or 'Enter name...')
     name.connect('key-press-event', press_enter)
     box.pack_start(label, True, True, 6)
     box.add(name)
@@ -199,7 +188,7 @@ def change_target(g):
     off.set_label('switch off')
     quit = Gtk.RadioButton.new_from_widget(start)
     quit.set_label('quit')
-    if g.start.value:
+    if g.start:
         box.add(start)
         box.add(fix)
         if g.conf.hide_tray:
@@ -241,9 +230,9 @@ def create_tray(g):
 
     def update():
         tray.set_tooltip_markup(get_tooltip(g))
-        if not g.start.value:
+        if not g.start:
             tray.set_from_stock(Gtk.STOCK_MEDIA_STOP)
-        elif g.active.value:
+        elif g.active:
             tray.set_from_stock(Gtk.STOCK_MEDIA_PLAY)
         else:
             tray.set_from_stock(Gtk.STOCK_MEDIA_PAUSE)
@@ -314,11 +303,11 @@ def create_menu(g):
     menu.append(quit)
 
     def update():
-        if not g.start.value:
+        if not g.start:
             off.hide()
             start.hide()
             stop.hide()
-        elif g.active.value:
+        elif g.active:
             off.show()
             start.hide()
             stop.show()
@@ -333,19 +322,19 @@ def create_menu(g):
 
 
 def _get_tooltip(g):
-    if not g.start.value:
+    if not g.start:
         result = ('<b>Wavelog is disabled</b>')
     else:
-        duration = str_secs(time.time() - g.start.value)
-        started = time.strftime('%H:%M:%S', time.localtime(g.start.value))
-        if g.active.value:
+        duration = str_secs(time.time() - g.start)
+        started = time.strftime('%H:%M:%S', time.localtime(g.start))
+        if g.active:
             result = (
                 '<b><big>Currently working</big></b>\n'
                 '  target: <b>{target}</b>\n'
                 '  started at: <b>{started}</b>\n'
                 '  duration: <b>{duration}</b>'
             ).format(
-                target=g.target.value,
+                target=g.target,
                 started=started,
                 duration=duration
             )
@@ -386,15 +375,15 @@ def get_tooltip(g, as_pango=True, load_last=False):
 
 def update_ui(g):
     duration_sec = 0
-    if g.start.value:
-        duration_sec = int(time.time() - g.start.value)
+    if g.start:
+        duration_sec = int(time.time() - g.start)
     duration = time.gmtime(duration_sec)
 
-    if not g.start.value:
+    if not g.start:
         duration_text = ''
         target_text = 'OFF'
     else:
-        target_text = g.target.value
+        target_text = g.target
         duration_text = '{}:{:02d}'.format(duration.tm_hour, duration.tm_min)
 
     max_h = 18
@@ -404,7 +393,7 @@ def update_ui(g):
     font_h = box_h * 0.77
     font_rgb = (0, 0, 0)
     timer_w = max_h * 1.5
-    color = (0.6, 0.9, 0.6) if g.active.value else (0.7, 0.7, 0.7)
+    color = (0.6, 0.9, 0.6) if g.active else (0.7, 0.7, 0.7)
 
     src = C.ImageSurface(C.FORMAT_ARGB32, max_w, max_h)
     ctx = C.Context(src)
@@ -448,9 +437,7 @@ def update_ui(g):
         g.tray.update()
 
     with open(g.path.last, 'wb') as f:
-        f.write(pickle.dumps([
-            g.target.value, g.active.value, g.start.value, time.time()
-        ]))
+        f.write(pickle.dumps([g.target, g.active, g.start, time.time()]))
     return True
 
 
@@ -460,11 +447,9 @@ def get_last_state(g):
         with open(g.path.last, 'rb') as f:
             target, active, start, last = pickle.load(f)
 
-    g = g._replace(
-        target=Variable(target),
-        active=Variable(active),
-        start=Variable(start)
-    )
+    g.target = target
+    g.active = active
+    g.start = start
     return g, last
 
 
@@ -493,21 +478,21 @@ def connect_db(db_path):
 
 
 def save_log(g, last=None):
-    if not g.start.value:
+    if not g.start:
         return
 
     if not last:
         last = time.time()
 
-    duration = int(last - g.start.value)
+    duration = int(last - g.start)
     if duration < g.conf.min_duration:
         return
 
     cur = g.db.cursor()
-    target = g.target.value
-    started = time.strftime(SQL_DATETIME, time.gmtime(g.start.value))
+    target = g.target
+    started = time.strftime(SQL_DATETIME, time.gmtime(g.start))
     ended = time.strftime(SQL_DATETIME, time.gmtime(last))
-    is_active = 1 if g.active.value else 0
+    is_active = 1 if g.active else 0
     cur.execute(
         'SELECT id FROM log WHERE started = ? AND target = ?',
         [started, target]
@@ -546,9 +531,9 @@ def do_action(g, action):
     if action == 'target':
         change_target(g)
     elif action == 'toggle-active':
-        if not g.start.value:
+        if not g.start:
             return False
-        set_activity(g, not g.active.value)
+        set_activity(g, not g.active)
     elif action == 'disable':
         disable(g)
     elif action == 'quit':
@@ -586,15 +571,15 @@ def get_last_working(g):
 
     to_dt = lambda v: calendar.timegm(time.strptime(v, SQL_DATETIME))
     rows = cursor.fetchall()
-    if g.active.value:
-        period = time.time() - g.start.value
+    if g.active:
+        period = time.time() - g.start
     else:
         period = 0
 
     if not rows:
         return period
 
-    if period and g.start.value - to_dt(rows[0][1]) > g.conf.off_timeout:
+    if period and g.start - to_dt(rows[0][1]) > g.conf.off_timeout:
         return period
 
     period += rows[0][2]
