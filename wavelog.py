@@ -218,6 +218,23 @@ def change_target(g):
     dialog.destroy()
 
 
+def show_report(g):
+    dialog = Gtk.MessageDialog()
+    dialog.add_button(Gtk.STOCK_OK, Gtk.ResponseType.OK)
+    dialog.set_markup(get_tooltip(g, load_last=True))
+
+    def update():
+        if not dialog.is_visible():
+            return False
+        if g.start:
+            dialog.set_markup(get_tooltip(g, load_last=True))
+        return True
+
+    GObject.timeout_add(g.conf.upd_period, update)
+    dialog.run()
+    dialog.destroy()
+
+
 def create_ui(g):
     menu = create_menu(g)
     win = create_win(g) if not g.conf.hide_win else None
@@ -300,6 +317,11 @@ def create_menu(g):
     target.connect('activate', lambda w: change_target(g))
     target.show()
 
+    stat = Gtk.ImageMenuItem.new_from_stock(Gtk.STOCK_PAGE_SETUP, None)
+    stat.set_label('Show statistics')
+    stat.connect('activate', lambda w: show_report(g))
+    stat.show()
+
     separator = Gtk.SeparatorMenuItem()
     separator.show()
 
@@ -312,6 +334,7 @@ def create_menu(g):
     menu.append(start)
     menu.append(stop)
     menu.append(off)
+    menu.append(stat)
     menu.append(separator)
     menu.append(quit)
 
