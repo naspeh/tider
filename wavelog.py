@@ -671,6 +671,19 @@ def print_report(g, args):
     print(result)
 
 
+def print_xfce4(g, args):
+    result = '<img>{}</img>'.format(g.path.img)
+    if args.click:
+        click = 'python {} do {}'.format(__file__, args.click)
+        result += '<click>{}</click>'.format(click)
+    if args.tooltip and not args.echo:
+        tooltip = get_tooltip(g, as_pango=False, load_last=True)
+        result += '<tool>{}</tool>'.format(tooltip)
+    if args.echo:
+        result = 'echo "{}"'.format(result)
+    print(result)
+
+
 def main(args=None):
     if args is None:
         args = sys.argv[1:]
@@ -706,17 +719,18 @@ def main(args=None):
     sub_xfce4 = subs.add_parser(
         'xfce4', help='command for xfce4-genmon-plugin'
     )
-    sub_xfce4.set_defaults(func=lambda: print(
-        '<img>{}</img>\n<tool>{}</tool>'
-        .format(g.path.img, get_tooltip(g, as_pango=False, load_last=True))
-        + (
-            '\n<click>python {} do {}</click>'.format(__file__, args.click)
-            if args.click else ''
-        )
-    ))
+    sub_xfce4.set_defaults(func=lambda : print_xfce4(g, args))
+    sub_xfce4.add_argument(
+        '-e', '--echo', action='store_true',
+        help='simple echo image'
+    )
     sub_xfce4.add_argument(
         '-c', '--click', choices=['menu', 'target'],
         help='show (menu|targer dialog) on click'
+    )
+    sub_xfce4.add_argument(
+        '-t', '--tooltip', action='store_true',
+        help='show tooltip'
     )
 
     args = parser.parse_args(args)
