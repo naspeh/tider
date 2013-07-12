@@ -9,7 +9,6 @@ import sqlite3
 import subprocess
 import sys
 import time
-from collections import namedtuple
 from threading import Thread
 
 import cairo as C
@@ -20,13 +19,46 @@ GObject.threads_init()
 SQL_DATE = '%Y-%m-%d'
 SQL_DATETIME = SQL_DATE + ' %H:%M:%S'
 
-Context = namedtuple('Context', (
+
+class _Context:
+    __slots__ = ()
+
+    def __init__(self, **kw):
+        defaults = dict((k, None) for k in self.__slots__)
+        defaults.update(kw)
+        for k, v in defaults.items():
+            setattr(self, k, v)
+
+    @property
+    def _items(self):
+        return [(k, getattr(self, k)) for k in self.__slots__]
+
+    def _replace(self, **kw):
+        for k, v in kw.items():
+            setattr(self, k, v)
+        return self
+
+    def __repr__(self):
+        return '{}({})'.format(
+            self.__class__.__name__,
+            ', '.join('{}={!r}'.format(*r) for r in self._items)
+        )
+
+
+def _context(name, fields):
+    if isinstance(fields, str):
+        fields = fields.split(' ')
+    cls = type(name, (_Context, ), {})
+    cls.__slots__ = fields
+    return cls
+
+Context = _context('Context', (
     'conf path db start active target win tray menu'
 ))
-Conf = namedtuple('Conf', (
+Conf = _context('Conf', (
     'refresh_timeout off_timeout min_duration hide_win hide_tray'
 ))
-Paths = namedtuple('Paths', 'root sock db img stat last')
+Paths = _context('Paths', 'root sock db img stat last')
 
 
 def get_context():
@@ -46,8 +78,7 @@ def get_context():
         hide_win=False,
         hide_tray=True,
     )
-    g = Context(*([None] * len(Context._fields)))
-    return g._replace(
+    return Context(
         conf=conf,
         path=paths,
         db=connect_db(paths.db),
@@ -66,34 +97,20 @@ class Variable:
 
 def wavelog():
     g = get_context()
+
+    g.menu = create_menu(g)
+    if not g.conf.hide_win:
+        g.win = create_win(g)
+    if not g.conf.hide_tray:
+        g.tray = create_tray(g)
+
     g, last = get_last_state(g)
-    g = g._replace(
-        win=create_win(g),
-        menu=create_menu(),
-        tray=Gtk.StatusIcon(visible=not g.conf.hide_tray),
-    )
     if last and time.time() - last > g.conf.off_timeout:
         disable(g, last=last)
 
-    if g.win:
-        g.win.connect('destroy', lambda w: Gtk.main_quit())
-        g.win.connect('delete_event', lambda w, e: Gtk.main_quit())
-        g.win.box.connect('button-press-event', lambda w, e: change_target(g))
-
-    g.menu.child_quit.connect('activate', lambda w: Gtk.main_quit())
-    g.menu.child_off.connect('activate', lambda w: disable(g))
-    g.menu.child_start.connect('activate', lambda w: set_activity(g, True))
-    g.menu.child_stop.connect('activate', lambda w: set_activity(g, False))
-    g.menu.child_target.connect('activate', lambda w: change_target(g))
-
-    g.tray.connect('activate', lambda w: change_target(g))
-    g.tray.connect('popup-menu', lambda icon, button, time: (
-        g.menu.popup(None, None, icon.position_menu, icon, button, time)
-    ))
     GObject.timeout_add(
         g.conf.refresh_timeout, lambda: not g.start.value or update_ui(g)
     )
-
     update_ui(g)
 
     server = Thread(target=run_server, args=(g,))
@@ -101,7 +118,6 @@ def wavelog():
     server.start()
 
     signal.signal(signal.SIGINT, lambda s, f: Gtk.main_quit())
-    signal.signal(signal.SIGTERM, lambda s, f: Gtk.main_quit())
     try:
         Gtk.main()
     finally:
@@ -114,13 +130,6 @@ def disable(g, last=None):
     g.start.value = None
     g.active.value = False
     update_ui(g)
-
-
-def toggle_win(widget, win):
-    if win.is_visible():
-        win.hide()
-    else:
-        win.show_all()
 
 
 def set_activity(g, active, target=None, new=True):
@@ -188,11 +197,15 @@ def change_target(g):
     fix.set_label('edit current')
     off = Gtk.RadioButton.new_from_widget(start)
     off.set_label('switch off')
+    quit = Gtk.RadioButton.new_from_widget(start)
+    quit.set_label('quit')
     if g.start.value:
         box.add(start)
         box.add(fix)
-        box.add(Gtk.HSeparator())
-        box.add(off)
+        if g.conf.hide_tray:
+            box.add(Gtk.HSeparator())
+            box.add(off)
+            box.add(quit)
 
     dialog.add_buttons(
         Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL,
@@ -209,11 +222,34 @@ def change_target(g):
         elif fix.get_active():
             set_activity(g, active, target=target, new=False)
         elif off.get_active():
-            g.menu.child_off.emit('activate')
+            disable(g)
+        elif quit.get_active():
+            Gtk.main_quit()
         else:
             raise ValueError('wrong state')
 
     dialog.destroy()
+
+
+def create_tray(g):
+    tray = Gtk.StatusIcon(visible=not g.conf.hide_tray)
+
+    tray.connect('activate', lambda w: change_target(g))
+    tray.connect('popup-menu', lambda icon, button, time: (
+        g.menu.popup(None, None, icon.position_menu, icon, button, time)
+    ))
+
+    def update():
+        tray.set_tooltip_markup(get_tooltip(g))
+        if not g.start.value:
+            tray.set_from_stock(Gtk.STOCK_MEDIA_STOP)
+        elif g.active.value:
+            tray.set_from_stock(Gtk.STOCK_MEDIA_PLAY)
+        else:
+            tray.set_from_stock(Gtk.STOCK_MEDIA_PAUSE)
+
+    tray.update = update
+    return tray
 
 
 def create_win(g):
@@ -233,29 +269,40 @@ def create_win(g):
     win.add(box)
     win.show_all()
 
-    win.img = img
-    win.box = box
+    win.connect('destroy', lambda w: Gtk.main_quit())
+    win.connect('delete_event', lambda w, e: Gtk.main_quit())
+    box.connect('button-press-event', lambda w, e: change_target(g))
+
+    def update():
+        img.set_from_file(g.path.img)
+
+    win.update = update
     return win
 
 
-def create_menu():
+def create_menu(g):
     start = Gtk.ImageMenuItem.new_from_stock(Gtk.STOCK_MEDIA_PLAY, None)
     start.set_label('Start working')
+    start.connect('activate', lambda w: set_activity(g, True))
 
     stop = Gtk.ImageMenuItem.new_from_stock(Gtk.STOCK_MEDIA_PAUSE, None)
     stop.set_label('Start break')
+    stop.connect('activate', lambda w: set_activity(g, False))
 
     off = Gtk.ImageMenuItem.new_from_stock(Gtk.STOCK_MEDIA_STOP, None)
     off.set_label('Switch off')
+    off.connect('activate', lambda w: disable(g))
 
     target = Gtk.ImageMenuItem.new_from_stock(Gtk.STOCK_OK, None)
     target.set_label('Set activity')
+    target.connect('activate', lambda w: change_target(g))
     target.show()
 
     separator = Gtk.SeparatorMenuItem()
     separator.show()
 
     quit = Gtk.ImageMenuItem.new_from_stock(Gtk.STOCK_QUIT, None)
+    quit.connect('activate', lambda w: Gtk.main_quit())
     quit.show()
 
     menu = Gtk.Menu()
@@ -266,12 +313,21 @@ def create_menu():
     menu.append(separator)
     menu.append(quit)
 
-    menu.child_start = start
-    menu.child_stop = stop
-    menu.child_off = off
-    menu.child_target = target
-    menu.child_quit = quit
+    def update():
+        if not g.start.value:
+            off.hide()
+            start.hide()
+            stop.hide()
+        elif g.active.value:
+            off.show()
+            start.hide()
+            stop.show()
+        else:
+            off.show()
+            stop.hide()
+            start.show()
 
+    menu.update = update
     menu.popup_default = lambda: menu.popup(None, None, None, None, 1, 0)
     return menu
 
@@ -335,22 +391,6 @@ def update_ui(g):
     duration = time.gmtime(duration_sec)
 
     if not g.start.value:
-        g.menu.child_off.hide()
-        g.menu.child_start.hide()
-        g.menu.child_stop.hide()
-        g.tray.set_from_stock(Gtk.STOCK_MEDIA_STOP)
-    elif g.active.value:
-        g.menu.child_off.show()
-        g.menu.child_start.hide()
-        g.menu.child_stop.show()
-        g.tray.set_from_stock(Gtk.STOCK_MEDIA_PLAY)
-    else:
-        g.menu.child_off.show()
-        g.menu.child_stop.hide()
-        g.menu.child_start.show()
-        g.tray.set_from_stock(Gtk.STOCK_MEDIA_PAUSE)
-
-    if not g.start.value:
         duration_text = ''
         target_text = 'OFF'
     else:
@@ -401,11 +441,11 @@ def update_ui(g):
     ctx.stroke()
 
     src.write_to_png(g.path.img)
+    g.menu.update()
     if g.win:
-        #pixbuf = Gdk.pixbuf_get_from_surface(src, 0, 0, max_w, max_h)
-        #g.win.img.set_from_pixbuf(pixbuf)
-        g.win.img.set_from_file(g.path.img)
-    g.tray.set_tooltip_markup(get_tooltip(g))
+        g.win.update()
+    if g.tray:
+        g.tray.update()
 
     with open(g.path.last, 'wb') as f:
         f.write(pickle.dumps([
@@ -504,13 +544,13 @@ def run_server(g):
 
 def do_action(g, action):
     if action == 'target':
-        g.menu.child_target.emit('activate')
+        change_target(g)
     elif action == 'toggle-active':
         if not g.start.value:
             return False
         set_activity(g, not g.active.value)
     elif action == 'disable':
-        g.menu.child_off.emit('activate')
+        disable(g)
     elif action == 'quit':
         Gtk.main_quit()
     elif action == 'menu':
