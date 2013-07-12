@@ -20,6 +20,60 @@ SQL_DATE = '%Y-%m-%d'
 SQL_DATETIME = SQL_DATE + ' %H:%M:%S'
 
 
+def get_context():
+    app_dir = os.path.join(os.path.dirname(__file__), 'var') + '/'
+    paths = new_ctx(
+        'Paths',
+        root=app_dir,
+        sock=app_dir + 'channel.sock',
+        db=app_dir + 'log.db',
+        img=app_dir + 'status.png',
+        stat=app_dir + 'stat.txt',
+        last=app_dir + 'last.txt',
+    )
+    conf = new_ctx(
+        'Conf',
+        upd_period=500,  # in microseconds
+        off_timeout=60,  # in seconds
+        min_duration=20,  # in seconds
+        hide_win=False,
+        hide_tray=False,
+    )
+    return new_ctx(
+        'Context',
+        conf=conf,
+        path=paths,
+        db=connect_db(paths.db),
+        start=None,
+        active=False,
+        target=None,
+        ui=None
+    )
+
+
+def wavelog():
+    g = get_context()
+
+    g.ui = create_ui(g)
+    g, last = get_last_state(g)
+    if last and time.time() - last > g.conf.off_timeout:
+        disable(g, last=last)
+    update_ui(g)
+
+    GObject.timeout_add(g.conf.upd_period, lambda: not g.start or update_ui(g))
+
+    server = Thread(target=run_server, args=(g,))
+    server.daemon = True
+    server.start()
+
+    signal.signal(signal.SIGINT, lambda s, f: Gtk.main_quit())
+    try:
+        Gtk.main()
+    finally:
+        disable(g)
+        print('Wavelog closed.')
+
+
 class _Context:
     __slots__ = ()
 
@@ -44,74 +98,10 @@ class _Context:
         )
 
 
-def _context(name, fields):
-    if isinstance(fields, str):
-        fields = fields.split(' ')
+def new_ctx(name, **fields):
     cls = type(name, (_Context, ), {})
-    cls.__slots__ = fields
-    return cls
-
-Context = _context('Context', (
-    'conf path db start active target win tray menu'
-))
-Conf = _context('Conf', (
-    'refresh_timeout off_timeout min_duration hide_win hide_tray'
-))
-Paths = _context('Paths', 'root sock db img stat last')
-
-
-def get_context():
-    app_dir = os.path.join(os.path.dirname(__file__), 'var') + '/'
-    paths = Paths(
-        root=app_dir,
-        sock=app_dir + 'channel.sock',
-        db=app_dir + 'log.db',
-        img=app_dir + 'status.png',
-        stat=app_dir + 'stat.txt',
-        last=app_dir + 'last.txt',
-    )
-    conf = Conf(
-        refresh_timeout=500,  # in microseconds
-        off_timeout=60,  # in seconds
-        min_duration=20,  # in seconds
-        hide_win=False,
-        hide_tray=False,
-    )
-    return Context(
-        conf=conf,
-        path=paths,
-        db=connect_db(paths.db),
-    )
-
-
-def wavelog():
-    g = get_context()
-
-    g.menu = create_menu(g)
-    if not g.conf.hide_win:
-        g.win = create_win(g)
-    if not g.conf.hide_tray:
-        g.tray = create_tray(g)
-
-    g, last = get_last_state(g)
-    if last and time.time() - last > g.conf.off_timeout:
-        disable(g, last=last)
-
-    GObject.timeout_add(
-        g.conf.refresh_timeout, lambda: not g.start or update_ui(g)
-    )
-    update_ui(g)
-
-    server = Thread(target=run_server, args=(g,))
-    server.daemon = True
-    server.start()
-
-    signal.signal(signal.SIGINT, lambda s, f: Gtk.main_quit())
-    try:
-        Gtk.main()
-    finally:
-        disable(g)
-        print('Wavelog closed.')
+    cls.__slots__ = fields.keys()
+    return cls(**fields)
 
 
 def disable(g, last=None):
@@ -220,12 +210,27 @@ def change_target(g):
     dialog.destroy()
 
 
-def create_tray(g):
+def create_ui(g):
+    menu = create_menu(g)
+    win = create_win(g) if not g.conf.hide_win else None
+    tray = create_tray(g, menu) if not g.conf.hide_tray else None
+
+    def update():
+        menu.update()
+        if win:
+            win.update()
+        if tray:
+            tray.update()
+
+    return new_ctx('UI', update=update, popup_menu=menu.popup_default)
+
+
+def create_tray(g, menu):
     tray = Gtk.StatusIcon(visible=not g.conf.hide_tray)
 
     tray.connect('activate', lambda w: change_target(g))
     tray.connect('popup-menu', lambda icon, button, time: (
-        g.menu.popup(None, None, icon.position_menu, icon, button, time)
+        menu.popup(None, None, icon.position_menu, icon, button, time)
     ))
 
     def update():
@@ -430,11 +435,7 @@ def update_ui(g):
     ctx.stroke()
 
     src.write_to_png(g.path.img)
-    g.menu.update()
-    if g.win:
-        g.win.update()
-    if g.tray:
-        g.tray.update()
+    g.ui.update()
 
     with open(g.path.last, 'wb') as f:
         f.write(pickle.dumps([g.target, g.active, g.start, time.time()]))
@@ -539,7 +540,7 @@ def do_action(g, action):
     elif action == 'quit':
         Gtk.main_quit()
     elif action == 'menu':
-        g.menu.popup_default()
+        g.ui.popup_menu()
 
 
 def send_action(g, action):
