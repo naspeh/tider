@@ -580,7 +580,7 @@ def do_action(g, action):
     elif action == 'quit':
         Gtk.main_quit()
     elif action == 'menu':
-        g.ui.popup_menu()
+        g.ui.popup_menu(None)
 
 
 def send_action(g, action):
