@@ -273,7 +273,7 @@ def create_win(g):
 
     win.connect('destroy', lambda w: Gtk.main_quit())
     win.connect('delete_event', lambda w, e: Gtk.main_quit())
-    box.connect('button-press-event', lambda w, e: change_target(g))
+    box.connect('button-press-event', lambda w, e: g.ui.popup_menu(e))
 
     def update():
         img.set_from_file(g.path.img)
@@ -330,7 +330,9 @@ def create_menu(g):
             start.show()
 
     menu.update = update
-    menu.popup_default = lambda: menu.popup(None, None, None, None, 1, 0)
+    menu.popup_default = lambda e: menu.popup(
+        None, None, None, None, e and e.button or 0, e and e.time or 0
+    )
     return menu
 
 
@@ -719,7 +721,7 @@ def main(args=None):
     sub_xfce4 = subs.add_parser(
         'xfce4', help='command for xfce4-genmon-plugin'
     )
-    sub_xfce4.set_defaults(func=lambda : print_xfce4(g, args))
+    sub_xfce4.set_defaults(func=lambda: print_xfce4(g, args))
     sub_xfce4.add_argument(
         '-e', '--echo', action='store_true',
         help='simple echo image'
