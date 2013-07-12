@@ -36,6 +36,7 @@ def get_context():
         upd_period=500,  # in microseconds
         off_timeout=60,  # in seconds
         min_duration=20,  # in seconds
+        break_symbol='*',
         hide_win=False,
         hide_tray=False,
     )
@@ -161,14 +162,19 @@ def change_target(g):
 
     label = Gtk.Label(halign=Gtk.Align.START)
     label.set_markup('<b>Activity:</b>')
-    name = Gtk.Entry(completion=get_completion(g))
-    name.set_text(g.target or 'Enter name...')
-    name.connect('key-press-event', press_enter)
     box.pack_start(label, True, True, 6)
-    box.add(name)
 
-    break_ = Gtk.CheckButton('is a break')
-    box.add(break_)
+    target = g.target if g.active else g.target + g.conf.break_symbol
+    name = Gtk.Entry(completion=get_completion(g))
+    name.set_max_length(20)
+    name.set_text(target or 'Enter name...')
+    name.connect('key-press-event', press_enter)
+    note = Gtk.Label(halign=Gtk.Align.END)
+    note.set_markup(
+        '<small>Use symbol <b>* in the end</b> for a break</small>'
+    )
+    box.add(name)
+    box.pack_start(note, True, True, 3)
 
     start = Gtk.RadioButton.new_from_widget(None)
     start.set_label('start new')
@@ -195,7 +201,9 @@ def change_target(g):
 
     if response == Gtk.ResponseType.OK:
         target = name.get_text().strip()
-        active = not break_.get_active()
+        active = not target.endswith(g.conf.break_symbol)
+        if not active:
+            target = target.rstrip(' *')
         if start.get_active():
             set_activity(g, active, target=target)
         elif fix.get_active():
