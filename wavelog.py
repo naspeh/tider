@@ -1,7 +1,8 @@
 import argparse
 import calendar
-import pickle
+import json
 import os
+import pickle
 import re
 import signal
 import socket
@@ -20,6 +21,31 @@ SQL_DATE = '%Y-%m-%d'
 SQL_DATETIME = SQL_DATE + ' %H:%M:%S'
 
 
+def get_config():
+    dirs = [
+        os.path.dirname(__file__),
+        os.path.join(os.path.expanduser('~'), '.config', 'wavelog')
+    ]
+    user = {}
+    for d in dirs:
+        file = os.path.join(d, 'config.json')
+        if os.path.exists(file):
+            with open(file, 'r') as f:
+                user = json.load(f)
+                break
+
+    conf = new_ctx(
+        'Conf',
+        upd_period=500,  # in microseconds
+        off_timeout=60,  # in seconds
+        min_duration=20,  # in seconds
+        break_symbol='*',
+        hide_win=False,
+        hide_tray=True,
+    )
+    return conf._replace(**user)
+
+
 def get_context():
     app_dir = os.path.join(os.path.dirname(__file__), 'var') + '/'
     paths = new_ctx(
@@ -31,24 +57,16 @@ def get_context():
         stat=app_dir + 'stat.txt',
         last=app_dir + 'last.txt',
     )
-    conf = new_ctx(
-        'Conf',
-        upd_period=500,  # in microseconds
-        off_timeout=60,  # in seconds
-        min_duration=20,  # in seconds
-        break_symbol='*',
-        hide_win=False,
-        hide_tray=False,
-    )
     return new_ctx(
         'Context',
-        conf=conf,
         path=paths,
+        conf=get_config(),
         db=connect_db(paths.db),
         start=None,
         active=False,
         target=None,
-        ui=None
+        ui=None,
+        tooltip=None
     )
 
 
@@ -180,17 +198,9 @@ def change_target(g):
     start.set_label('start new')
     fix = Gtk.RadioButton.new_from_widget(start)
     fix.set_label('edit current')
-    off = Gtk.RadioButton.new_from_widget(start)
-    off.set_label('switch off')
-    quit = Gtk.RadioButton.new_from_widget(start)
-    quit.set_label('quit')
     if g.start:
         box.add(start)
         box.add(fix)
-        if g.conf.hide_tray:
-            box.add(Gtk.HSeparator())
-            box.add(off)
-            box.add(quit)
 
     dialog.add_buttons(
         Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL,
@@ -208,10 +218,6 @@ def change_target(g):
             set_activity(g, active, target=target)
         elif fix.get_active():
             set_activity(g, active, target=target, new=False)
-        elif off.get_active():
-            disable(g)
-        elif quit.get_active():
-            Gtk.main_quit()
         else:
             raise ValueError('wrong state')
 
@@ -221,13 +227,13 @@ def change_target(g):
 def show_report(g):
     dialog = Gtk.MessageDialog()
     dialog.add_button(Gtk.STOCK_OK, Gtk.ResponseType.OK)
-    dialog.set_markup(get_tooltip(g, load_last=True))
+    dialog.set_markup(g.tooltip)
 
     def update():
-        if not dialog.is_visible():
+        if not dialog.is_visible() or not g.start:
             return False
-        if g.start:
-            dialog.set_markup(get_tooltip(g, load_last=True))
+
+        dialog.set_markup(g.tooltip)
         return True
 
     GObject.timeout_add(g.conf.upd_period, update)
@@ -259,7 +265,7 @@ def create_tray(g, menu):
     ))
 
     def update():
-        tray.set_tooltip_markup(get_tooltip(g))
+        tray.set_tooltip_markup(g.tooltip)
         if not g.start:
             tray.set_from_stock(Gtk.STOCK_MEDIA_STOP)
         elif g.active:
@@ -468,6 +474,7 @@ def update_ui(g):
     ctx.stroke()
 
     src.write_to_png(g.path.img)
+    g.tooltip = get_tooltip(g)
     g.ui.update()
 
     with open(g.path.last, 'wb') as f:
@@ -709,6 +716,11 @@ def print_xfce4(g, args):
     print(result)
 
 
+def print_conf():
+    conf = get_config()
+    print(json.dumps(dict(conf._items), indent=4))
+
+
 def main(args=None):
     if args is None:
         args = sys.argv[1:]
@@ -757,6 +769,9 @@ def main(args=None):
         '-t', '--tooltip', action='store_true',
         help='show tooltip'
     )
+
+    sub_conf = subs.add_parser('conf', help='print example conf')
+    sub_conf.set_defaults(func=print_conf)
 
     args = parser.parse_args(args)
     try:
