@@ -21,19 +21,7 @@ SQL_DATE = '%Y-%m-%d'
 SQL_DATETIME = SQL_DATE + ' %H:%M:%S'
 
 
-def get_config():
-    dirs = [
-        os.path.dirname(__file__),
-        os.path.join(os.path.expanduser('~'), '.config', 'wavelog')
-    ]
-    user = {}
-    for d in dirs:
-        file = os.path.join(d, 'config.json')
-        if os.path.exists(file):
-            with open(file, 'r') as f:
-                user = json.load(f)
-                break
-
+def get_config(file):
     conf = new_ctx(
         'Conf',
         upd_period=500,  # in microseconds
@@ -43,14 +31,33 @@ def get_config():
         hide_win=False,
         hide_tray=True,
     )
-    return conf._replace(**user)
+
+    user_conf = {}
+    if os.path.exists(file):
+        with open(file, 'r') as f:
+            user_conf = json.load(f)
+    return conf._replace(**user_conf)
 
 
-def get_context():
-    app_dir = os.path.join(os.path.dirname(__file__), 'var') + '/'
-    paths = new_ctx(
+def get_paths():
+    dirs = [
+        os.path.join(os.path.dirname(__file__), 'var'),
+        os.path.join(os.path.expanduser('~'), '.config', 'wavelog')
+    ]
+    app_dir = dirs[-1]
+    for d in dirs:
+        if os.path.exists(d):
+            app_dir = d
+            break
+
+    if not os.path.exists(app_dir):
+        os.mkdir(app_dir)
+
+    app_dir = app_dir + os.path.sep
+    return  new_ctx(
         'Paths',
         root=app_dir,
+        conf=app_dir + 'config.json',
         sock=app_dir + 'channel.sock',
         db=app_dir + 'log.db',
         img=app_dir + 'status.png',
@@ -58,10 +65,14 @@ def get_context():
         stat=app_dir + 'stat.txt',
         last=app_dir + 'last.txt',
     )
+
+
+def get_context():
+    paths = get_paths()
     return new_ctx(
         'Context',
         path=paths,
-        conf=get_config(),
+        conf=get_config(paths.conf),
         db=connect_db(paths.db),
         start=None,
         active=False,
