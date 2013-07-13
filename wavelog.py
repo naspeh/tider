@@ -29,7 +29,9 @@ DEFAULTS = (
     ('min_duration', ('20',  'int', 'in seconds')),
     ('break_symbol', ('*', '', '')),
     ('hide_win', ('no', 'boolean', '')),
-    ('hide_tray', ('yes', 'boolean', ''))
+    ('hide_tray', ('yes', 'boolean', '')),
+    ('width', ('0', 'int', '')),
+    ('height', ('20', 'int', '')),
 )
 
 
@@ -452,8 +454,9 @@ def update_ui(g):
         target_text = g.target
         duration_text = '{}:{:02d}'.format(duration.tm_hour, duration.tm_min)
 
-    max_h = 18
-    max_w = int(max_h * 5)
+    max_h = max(16, g.conf.height)
+    max_w = int(max_h * 4)
+    max_w = max(max_w, g.conf.width)
     padding = max_h * 0.125
     box_h = max_h - 2 * padding
     font_h = box_h * 0.77
