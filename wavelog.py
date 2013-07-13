@@ -28,12 +28,12 @@ DEFAULTS = (
     ('off_timeout', ('60', 'int', 'in seconds')),
     ('min_duration', ('20',  'int', 'in seconds')),
     ('break_symbol', ('*', '', '')),
-    ('hide_win', ('no', 'boolean', '')),
-    ('hide_tray', ('yes', 'boolean', '')),
-    ('width', ('0', 'int', '')),
     ('height', ('20', 'int', '')),
-    ('move_x', ('0', 'int', '')),
-    ('move_y', ('0', 'int', '')),
+    ('width', (None, 'int', '')),
+    ('win_hide', ('no', 'boolean', '')),
+    ('win_move_x', (None, 'int', '')),
+    ('win_move_y', (None, 'int', '')),
+    ('tray_hide', ('yes', 'boolean', '')),
 )
 
 
@@ -52,7 +52,10 @@ def get_config(file):
     for k, v in parser.items():
         if k not in defaults_dict:
             raise KeyError('Wrong key: ' + k)
-        conf[k] = getattr(parser, 'get' + defaults_dict[k][1])(k)
+        if parser.get(k):
+            conf[k] = getattr(parser, 'get' + defaults_dict[k][1])(k)
+        else:
+            conf[k] = None
 
     return new_ctx('Conf', **conf)
 
@@ -269,8 +272,8 @@ def show_report(g):
 
 def create_ui(g):
     menu = create_menu(g)
-    win = create_win(g) if not g.conf.hide_win else None
-    tray = create_tray(g, menu) if not g.conf.hide_tray else None
+    win = create_win(g) if not g.conf.win_hide else None
+    tray = create_tray(g, menu) if not g.conf.tray_hide else None
 
     def update():
         menu.update()
@@ -283,7 +286,7 @@ def create_ui(g):
 
 
 def create_tray(g, menu):
-    tray = Gtk.StatusIcon(visible=not g.conf.hide_tray)
+    tray = Gtk.StatusIcon()
 
     tray.connect('activate', lambda w: change_target(g))
     tray.connect('popup-menu', lambda icon, button, time: (
@@ -304,9 +307,6 @@ def create_tray(g, menu):
 
 
 def create_win(g):
-    if g.conf.hide_win:
-        return
-
     img = Gtk.Image()
     box = Gtk.EventBox()
     box.add(img)
@@ -316,8 +316,10 @@ def create_win(g):
         skip_pager_hint=True, skip_taskbar_hint=True
     )
     win.set_keep_above(True)
-    win.move(g.conf.move_x, g.conf.move_y)
     win.add(box)
+
+    if g.conf.win_move_x is not None or g.conf.win_move_y is not None:
+        win.move(g.conf.win_move_x or 0, g.conf.win_move_y or 0)
     win.show_all()
 
     win.connect('destroy', lambda w: Gtk.main_quit())
@@ -385,8 +387,9 @@ def create_menu(g):
             start.show()
 
     menu.update = update
-    menu.popup_default = lambda e: menu.popup(
-        None, None, None, None, e and e.button or 0, e and e.time or 0
+    menu.popup_default = lambda e: (
+        menu.popup(None, None, None, None, e.button, e.time)
+        if e else menu.popup(None, None, None, None, 0, 0)
     )
     return menu
 
@@ -458,7 +461,8 @@ def update_ui(g):
 
     max_h = max(12, g.conf.height)
     max_w = int(max_h * 4)
-    max_w = max(max_w, g.conf.width)
+    if g.conf.width:
+        max_w = max(max_w, g.conf.width)
     padding = max_h * 0.125
     box_h = max_h - 2 * padding
     font_h = box_h * 0.77
