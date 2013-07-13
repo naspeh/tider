@@ -32,6 +32,8 @@ DEFAULTS = (
     ('hide_tray', ('yes', 'boolean', '')),
     ('width', ('0', 'int', '')),
     ('height', ('20', 'int', '')),
+    ('move_x', ('0', 'int', '')),
+    ('move_y', ('0', 'int', '')),
 )
 
 
@@ -314,7 +316,7 @@ def create_win(g):
         skip_pager_hint=True, skip_taskbar_hint=True
     )
     win.set_keep_above(True)
-    win.move(960, 0)
+    win.move(g.conf.move_x, g.conf.move_y)
     win.add(box)
     win.show_all()
 
@@ -454,7 +456,7 @@ def update_ui(g):
         target_text = g.target
         duration_text = '{}:{:02d}'.format(duration.tm_hour, duration.tm_min)
 
-    max_h = max(16, g.conf.height)
+    max_h = max(12, g.conf.height)
     max_w = int(max_h * 4)
     max_w = max(max_w, g.conf.width)
     padding = max_h * 0.125
