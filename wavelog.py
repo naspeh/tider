@@ -54,6 +54,7 @@ def get_context():
         sock=app_dir + 'channel.sock',
         db=app_dir + 'log.db',
         img=app_dir + 'status.png',
+        img_new=app_dir + 'status-new.png',
         stat=app_dir + 'stat.txt',
         last=app_dir + 'last.txt',
     )
@@ -473,7 +474,8 @@ def update_ui(g):
     ctx.line_to(timer_w - duration_w, max_h - line_h / 2)
     ctx.stroke()
 
-    src.write_to_png(g.path.img)
+    src.write_to_png(g.path.img_new)
+    os.rename(g.path.img_new, g.path.img)
     g.tooltip = get_tooltip(g)
     g.ui.update()
 
