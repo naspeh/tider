@@ -1,6 +1,5 @@
 import argparse
 import calendar
-import json
 import os
 import pickle
 import re
@@ -10,6 +9,7 @@ import sqlite3
 import subprocess
 import sys
 import time
+from configparser import ConfigParser
 from threading import Thread
 
 import cairo as C
@@ -19,33 +19,43 @@ GObject.threads_init()
 
 SQL_DATE = '%Y-%m-%d'
 SQL_DATETIME = SQL_DATE + ' %H:%M:%S'
+APP_DIRS = [
+    os.path.join(os.path.dirname(__file__), 'var'),
+    os.path.join(os.path.expanduser('~'), '.config', 'wavelog')
+]
+DEFAULTS = (
+    ('upd_period', ('500', 'int', 'in microseconds')),
+    ('off_timeout', ('60', 'int', 'in seconds')),
+    ('min_duration', ('20',  'int', 'in seconds')),
+    ('break_symbol', ('*', '', '')),
+    ('hide_win', ('no', 'boolean', '')),
+    ('hide_tray', ('yes', 'boolean', ''))
+)
 
 
 def get_config(file):
-    conf = new_ctx(
-        'Conf',
-        upd_period=500,  # in microseconds
-        off_timeout=60,  # in seconds
-        min_duration=20,  # in seconds
-        break_symbol='*',
-        hide_win=False,
-        hide_tray=True,
-    )
+    defaults = dict((k, v[0]) for k, v in DEFAULTS)
 
-    user_conf = {}
+    parser = ConfigParser(defaults=defaults)
     if os.path.exists(file):
-        with open(file, 'r') as f:
-            user_conf = json.load(f)
-    return conf._replace(**user_conf)
+        parser.read(file)
+    else:
+        parser.read_dict({'default': {}})
+
+    parser = parser['default']
+    conf = {}
+    defaults_dict = dict(DEFAULTS)
+    for k, v in parser.items():
+        if k not in defaults_dict:
+            raise KeyError('Wrong key: ' + k)
+        conf[k] = getattr(parser, 'get' + defaults_dict[k][1])(k)
+
+    return new_ctx('Conf', **conf)
 
 
 def get_paths():
-    dirs = [
-        os.path.join(os.path.dirname(__file__), 'var'),
-        os.path.join(os.path.expanduser('~'), '.config', 'wavelog')
-    ]
-    app_dir = dirs[-1]
-    for d in dirs:
+    app_dir = APP_DIRS[-1]
+    for d in APP_DIRS:
         if os.path.exists(d):
             app_dir = d
             break
@@ -54,14 +64,14 @@ def get_paths():
         os.mkdir(app_dir)
 
     app_dir = app_dir + os.path.sep
-    return  new_ctx(
+    return new_ctx(
         'Paths',
         root=app_dir,
-        conf=app_dir + 'config.json',
+        conf=app_dir + 'config.ini',
         sock=app_dir + 'channel.sock',
         db=app_dir + 'log.db',
         img=app_dir + 'status.png',
-        img_new=app_dir + 'status-new.png',
+        img_tmp=app_dir + 'status-tmp.png',
         stat=app_dir + 'stat.txt',
         last=app_dir + 'last.txt',
     )
@@ -485,8 +495,8 @@ def update_ui(g):
     ctx.line_to(timer_w - duration_w, max_h - line_h / 2)
     ctx.stroke()
 
-    src.write_to_png(g.path.img_new)
-    os.rename(g.path.img_new, g.path.img)
+    src.write_to_png(g.path.img_tmp)
+    os.rename(g.path.img_tmp, g.path.img)
     g.tooltip = get_tooltip(g)
     g.ui.update()
 
@@ -730,8 +740,14 @@ def print_xfce4(g, args):
 
 
 def print_conf():
-    conf = get_config()
-    print(json.dumps(dict(conf._items), indent=4))
+    result = ['[default]\n']
+    for k, v in DEFAULTS:
+        line = '{}={}'.format(k, v[0])
+        if v[2]:
+            line = '# {}\n{}'.format(v[2], line)
+        line += '\n\n'
+        result.append(line)
+    print(''.join(result))
 
 
 def main(args=None):
