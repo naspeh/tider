@@ -30,11 +30,27 @@ DEFAULTS = (
     ('break_symbol', ('*', '', '')),
     ('height', ('20', 'int', '')),
     ('width', (None, 'int', '')),
-    ('win_hide', ('no', 'boolean', '')),
+    ('hide_tray', ('yes', 'boolean', '')),
+    ('hide_win', ('no', 'boolean', '')),
     ('win_move_x', (None, 'int', '')),
     ('win_move_y', (None, 'int', '')),
-    ('tray_hide', ('yes', 'boolean', '')),
 )
+
+
+def wavelog():
+    g = get_context()
+    g.ui = create_ui(g)
+
+    server = Thread(target=run_server, args=(g,))
+    server.daemon = True
+    server.start()
+
+    signal.signal(signal.SIGINT, lambda s, f: Gtk.main_quit())
+    try:
+        Gtk.main()
+    finally:
+        disable(g)
+        print('Wavelog closed.')
 
 
 def get_config(file):
@@ -57,7 +73,7 @@ def get_config(file):
         else:
             conf[k] = None
 
-    return new_ctx('Conf', **conf)
+    return fixslots('Conf', **conf)
 
 
 def get_paths():
@@ -71,7 +87,7 @@ def get_paths():
         os.mkdir(app_dir)
 
     app_dir = app_dir + os.path.sep
-    return new_ctx(
+    return fixslots(
         'Paths',
         root=app_dir,
         conf=app_dir + 'config.ini',
@@ -79,14 +95,14 @@ def get_paths():
         db=app_dir + 'log.db',
         img=app_dir + 'status.png',
         img_tmp=app_dir + 'status-tmp.png',
-        stat=app_dir + 'stat.txt',
         last=app_dir + 'last.txt',
+        stats=app_dir + 'stats.txt',
     )
 
 
 def get_context():
     paths = get_paths()
-    return new_ctx(
+    g = fixslots(
         'Context',
         path=paths,
         conf=get_config(paths.conf),
@@ -94,35 +110,14 @@ def get_context():
         start=None,
         active=False,
         target=None,
+        stats=None,
         ui=None,
-        tooltip=None
     )
+    set_last_state(g)
+    return g
 
 
-def wavelog():
-    g = get_context()
-
-    g.ui = create_ui(g)
-    g, last = get_last_state(g)
-    if last and time.time() - last > g.conf.off_timeout:
-        disable(g, last=last)
-    update_ui(g)
-
-    GObject.timeout_add(g.conf.upd_period, lambda: not g.start or update_ui(g))
-
-    server = Thread(target=run_server, args=(g,))
-    server.daemon = True
-    server.start()
-
-    signal.signal(signal.SIGINT, lambda s, f: Gtk.main_quit())
-    try:
-        Gtk.main()
-    finally:
-        disable(g)
-        print('Wavelog closed.')
-
-
-class _Context:
+class _FixedSlots:
     __slots__ = ()
 
     def __init__(self, **kw):
@@ -146,8 +141,8 @@ class _Context:
         )
 
 
-def new_ctx(name, **fields):
-    cls = type(name, (_Context, ), {})
+def fixslots(name, **fields):
+    cls = type(name, (_FixedSlots, ), {})
     cls.__slots__ = fields.keys()
     return cls(**fields)
 
@@ -156,12 +151,10 @@ def disable(g, last=None):
     save_log(g, last=last)
     g.start = None
     g.active = False
-    update_ui(g)
+    update_img(g)
 
 
 def set_activity(g, active, target=None, new=True):
-    assert active in [False, True]
-
     if not target:
         target = g.target
 
@@ -174,7 +167,7 @@ def set_activity(g, active, target=None, new=True):
 
     g.target = target
     g.active = active
-    update_ui(g)
+    update_img(g)
 
 
 def get_completion(g):
@@ -256,13 +249,13 @@ def change_target(g):
 def show_report(g):
     dialog = Gtk.MessageDialog()
     dialog.add_button(Gtk.STOCK_OK, Gtk.ResponseType.OK)
-    dialog.set_markup(g.tooltip)
+    dialog.set_markup(g.stats)
 
     def update():
         if not dialog.is_visible() or not g.start:
             return False
 
-        dialog.set_markup(g.tooltip)
+        dialog.set_markup(g.stats)
         return True
 
     GObject.timeout_add(g.conf.upd_period, update)
@@ -272,17 +265,21 @@ def show_report(g):
 
 def create_ui(g):
     menu = create_menu(g)
-    win = create_win(g) if not g.conf.win_hide else None
-    tray = create_tray(g, menu) if not g.conf.tray_hide else None
+    win = create_win(g) if not g.conf.hide_win else None
+    tray = create_tray(g, menu) if not g.conf.hide_tray else None
 
     def update():
+        update_img(g)
         menu.update()
         if win:
             win.update()
         if tray:
             tray.update()
+        return True
 
-    return new_ctx('UI', update=update, popup_menu=menu.popup_default)
+    update()
+    GObject.timeout_add(g.conf.upd_period, lambda: not g.start or update())
+    return fixslots('UI', update=update, popup_menu=menu.popup_default)
 
 
 def create_tray(g, menu):
@@ -294,7 +291,7 @@ def create_tray(g, menu):
     ))
 
     def update():
-        tray.set_tooltip_markup(g.tooltip)
+        tray.set_tooltip_markup(g.stats)
         if not g.start:
             tray.set_from_stock(Gtk.STOCK_MEDIA_STOP)
         elif g.active:
@@ -326,10 +323,7 @@ def create_win(g):
     win.connect('delete_event', lambda w, e: Gtk.main_quit())
     box.connect('button-press-event', lambda w, e: g.ui.popup_menu(e))
 
-    def update():
-        img.set_from_file(g.path.img)
-
-    win.update = update
+    win.update = lambda: img.set_from_file(g.path.img)
     return win
 
 
@@ -394,59 +388,31 @@ def create_menu(g):
     return menu
 
 
-def _get_tooltip(g):
+def get_stats(g):
     if not g.start:
         result = ('<b>Wavelog is disabled</b>')
     else:
-        duration = str_secs(time.time() - g.start)
-        started = time.strftime('%H:%M:%S', time.localtime(g.start))
-        if g.active:
-            result = (
-                '<b><big>Currently working</big></b>\n'
-                '  target: <b>{target}</b>\n'
-                '  started at: <b>{started}</b>\n'
-                '  duration: <b>{duration}</b>'
-            ).format(
+        result = (
+            '<b><big>Currently {state}</big></b>\n'
+            '  target: <b>{target}</b>\n'
+            '  started at: <b>{started}</b>\n'
+            '  duration: <b>{duration}</b>'
+            .format(
+                state='working' if g.active else 'break',
                 target=g.target,
-                started=started,
-                duration=duration
+                started=time.strftime('%H:%M:%S', time.localtime(g.start)),
+                duration=str_secs(time.time() - g.start)
             )
-        else:
-            result = (
-                '<b><big>Currently break</big></b>\n'
-                '  started at: <b>{started}</b>\n'
-                '  duration: <b>{duration}</b>'
-            ).format(
-                started=started,
-                duration=duration,
-            )
+        )
     last_working = (
         '<b>Last working period: {}</b>'
         .format(str_secs(get_last_working(g)))
     )
     result = '\n\n'.join([result, last_working, get_report(g)])
-
-    with open(g.path.stat, 'w') as f:
-        f.write(result)
     return result
 
 
-def get_tooltip(g, as_pango=True, load_last=False):
-    if load_last:
-        g = get_last_state(g)[0]
-
-        if os.path.exists(g.path.stat):
-            with open(g.path.stat, 'r') as f:
-                result = f.read()
-    else:
-        result = _get_tooltip(g)
-
-    if not as_pango:
-        result = re.sub(r'<[^>]+>', '', result)
-    return result
-
-
-def update_ui(g):
+def update_img(g):
     duration_sec = 0
     if g.start:
         duration_sec = int(time.time() - g.start)
@@ -506,24 +472,28 @@ def update_ui(g):
 
     src.write_to_png(g.path.img_tmp)
     os.rename(g.path.img_tmp, g.path.img)
-    g.tooltip = get_tooltip(g)
-    g.ui.update()
+    g.stats = get_stats(g)
 
     with open(g.path.last, 'wb') as f:
         f.write(pickle.dumps([g.target, g.active, g.start, time.time()]))
+
+    with open(g.path.stats, 'w') as f:
+        f.write(g.stats)
     return True
 
 
-def get_last_state(g):
-    target, active, start, last = None, False, None, None
+def set_last_state(g):
+    last = None
     if os.path.exists(g.path.last):
         with open(g.path.last, 'rb') as f:
-            target, active, start, last = pickle.load(f)
+            g.target, g.active, g.start, last = pickle.load(f)
 
-    g.target = target
-    g.active = active
-    g.start = start
-    return g, last
+    if os.path.exists(g.path.stats):
+        with open(g.path.stats, 'r') as f:
+            g.stats = f.read()
+
+    if last and time.time() - last > g.conf.off_timeout:
+        disable(g, last=last)
 
 
 def connect_db(db_path):
@@ -578,8 +548,6 @@ def save_log(g, last=None):
         )
         g.db.commit()
 
-    os.remove(g.path.last)
-
 
 def run_server(g):
     sockfile = g.path.sock
@@ -621,6 +589,10 @@ def send_action(g, action):
     s.connect(sockfile)
     s.send(action.encode())
     s.close()
+
+
+def strip_tags(r):
+    return re.sub(r'<[^>]+>', '', r)
 
 
 def str_secs(duration):
@@ -741,22 +713,20 @@ def print_xfce4(g, args):
         click = 'python {} do {}'.format(__file__, args.click)
         result += '<click>{}</click>'.format(click)
     if args.tooltip and not args.echo:
-        tooltip = get_tooltip(g, as_pango=False, load_last=True)
-        result += '<tool>{}</tool>'.format(tooltip)
+        result += '<tool>{}</tool>'.format(strip_tags(g.stats))
     if args.echo:
         result = 'echo "{}"'.format(result)
     print(result)
 
 
 def print_conf():
-    result = ['[default]\n']
+    result = []
     for k, v in DEFAULTS:
-        line = '{}={}'.format(k, v[0])
+        line = '{}={}'.format(k, v[0] if v[0] else '')
         if v[2]:
             line = '# {}\n{}'.format(v[2], line)
-        line += '\n\n'
         result.append(line)
-    print(''.join(result))
+    print('[default]\n' + '\n\n'.join(result))
 
 
 def main(args=None):
