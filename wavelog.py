@@ -1,5 +1,4 @@
 import argparse
-import calendar
 import os
 import pickle
 import re
@@ -659,7 +658,7 @@ def get_report(g, interval=None):
     ]
     if rows:
         result += ['\n  Details:']
-        for target, dur_work, dur_break  in rows:
+        for target, dur_work, dur_break in rows:
             line = '    {}: {}'.format(target, str_secs(dur_work))
             if dur_break:
                 line += ' (and breaks: {})'.format(str_secs(dur_break))
