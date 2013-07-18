@@ -506,7 +506,7 @@ def connect_db(db_path):
             '''
             CREATE TABLE `log`(
                 `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
-                `target` varchar(255) NOT NULL,
+                `target` TEXT NOT NULL,
                 `started` TEXT,
                 `ended` TEXT,
                 `duration` INTEGER,
@@ -560,14 +560,14 @@ def run_server(g):
         conn, addr = s.accept()
         while True:
             data = conn.recv(1024)
-            GObject.idle_add(do_action, g, data.decode())
+            GObject.idle_add(call_action, g, data.decode())
             if not data:
                 break
 
     conn.close()
 
 
-def do_action(g, action):
+def call_action(g, action):
     if action == 'target':
         change_target(g)
     elif action == 'toggle-active':
@@ -740,18 +740,21 @@ def main(args=None):
     parser = argparse.ArgumentParser()
     subs = parser.add_subparsers()
 
-    sub_do = subs.add_parser('do', help='apply action')
+    # call action
+    sub_do = subs.add_parser('call', help='call a specific action')
+    sub_do.set_defaults(func=lambda: send_action(g, args.action))
     sub_do.add_argument(
         'action', help='choice action',
         choices=['target', 'menu', 'toggle-active', 'disable', 'quit']
     )
-    sub_do.set_defaults(func=lambda: send_action(g, args.action))
 
+    # sqlite session
     sub_db = subs.add_parser('db', help='enter to sqlite session')
     sub_db.set_defaults(func=lambda: (
         subprocess.call('sqlite3 {}'.format(g.path.db), shell=True)
     ))
 
+    # statistics
     sub_report = subs.add_parser('report', aliases=['re'], help='print report')
     sub_report.set_defaults(func=lambda: print_report(g, args))
     sub_report.add_argument(
@@ -760,24 +763,24 @@ def main(args=None):
         type=lambda v: [time.strptime(i, '%Y%m%d') for i in v.split('-', 1)]
     )
 
+    # xfce4 integration
     sub_xfce4 = subs.add_parser(
         'xfce4', help='command for xfce4-genmon-plugin'
     )
     sub_xfce4.set_defaults(func=lambda: print_xfce4(g, args))
     sub_xfce4.add_argument(
-        '-e', '--echo', action='store_true',
-        help='simple echo image'
+        '-e', '--echo', action='store_true', help='use `echo` command'
     )
     sub_xfce4.add_argument(
         '-c', '--click', choices=['menu', 'target'],
-        help='show (menu|targer dialog) on click'
+        help='show (menu|target) dialog on click'
     )
     sub_xfce4.add_argument(
-        '-t', '--tooltip', action='store_true',
-        help='show tooltip'
+        '-t', '--tooltip', action='store_true', help='show tooltip'
     )
 
-    sub_conf = subs.add_parser('conf', help='print example conf')
+    # config example
+    sub_conf = subs.add_parser('conf', help='print config example')
     sub_conf.set_defaults(func=print_conf)
 
     args = parser.parse_args(args)
