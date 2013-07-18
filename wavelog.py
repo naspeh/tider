@@ -669,12 +669,11 @@ def get_report(g, interval=None):
 
 
 def print_report(g, args):
-    interval = None
+    interval = []
     if args.interval:
         if len(args.interval) == 2 and args.interval[0] > args.interval[1]:
             raise SystemExit('Wrong interval: second date less than first')
         interval = args.interval
-
     result = get_report(g, [time.mktime(i) for i in interval])
     result = re.sub(r'<[^>]+>', '', result)
     print(result)
