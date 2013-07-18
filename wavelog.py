@@ -204,10 +204,9 @@ def change_target(g):
     label.set_markup('<b>Activity:</b>')
     box.pack_start(label, True, True, 6)
 
-    target = g.target if g.active else g.target + g.conf.break_symbol
     name = Gtk.Entry(completion=get_completion(g))
     name.set_max_length(20)
-    name.set_text(target or 'Enter name...')
+    name.set_text(g.target or 'Enter name...')
     name.connect('key-press-event', press_enter)
     note = Gtk.Label(halign=Gtk.Align.END)
     note.set_markup(
