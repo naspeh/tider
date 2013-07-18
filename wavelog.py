@@ -29,6 +29,7 @@ DEFAULTS = (
     ('break_symbol', ('*', '', '')),
     ('height', ('20', 'int', '')),
     ('width', (None, 'int', '')),
+    ('font_size', (None, 'int', '')),
     ('hide_tray', ('yes', 'boolean', '')),
     ('hide_win', ('no', 'boolean', '')),
     ('win_move_x', (None, 'int', '')),
@@ -430,6 +431,8 @@ def update_img(g):
     padding = max_h * 0.125
     box_h = max_h - 2 * padding
     font_h = box_h * 0.77
+    if g.conf.font_size:
+        font_h = min(font_h, g.conf.font_size)
     font_rgb = (0, 0, 0)
     timer_w = max_h * 1.5
     color = (0.6, 0.9, 0.6) if g.active else (0.7, 0.7, 0.7)
