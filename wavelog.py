@@ -91,7 +91,7 @@ def get_paths():
         'Paths',
         root=app_dir,
         conf=app_dir + 'config.ini',
-        sock=app_dir + 'channel.sock',
+        sock=app_dir + 'server.sock',
         db=app_dir + 'log.db',
         img=app_dir + 'status.png',
         img_tmp=app_dir + 'status-tmp.png',
@@ -176,7 +176,7 @@ def get_completion(g):
         '''
         SELECT DISTINCT target FROM log
             GROUP BY target
-            ORDER BY datetime(started) DESC
+            ORDER BY start DESC
             LIMIT 20
         '''
     )
@@ -505,13 +505,13 @@ def connect_db(db_path):
         cur.execute(
             '''
             CREATE TABLE `log`(
-                `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                `id` INTEGER PRIMARY KEY,
                 `target` TEXT NOT NULL,
-                `started` TEXT,
-                `ended` TEXT,
-                `duration` INTEGER,
-                `is_active` INTEGER,
-                UNIQUE (target, started)
+                `start` INTEGER NOT NULL,
+                `end` INTEGER,
+                `work` INTEGER,
+                `break` INTEGER,
+                UNIQUE (target, start)
             )
             '''
         )
@@ -531,19 +531,17 @@ def save_log(g, last=None):
         return
 
     cur = g.db.cursor()
-    target = g.target
-    started = time.strftime(SQL_DATETIME, time.gmtime(g.start))
-    ended = time.strftime(SQL_DATETIME, time.gmtime(last))
-    is_active = 1 if g.active else 0
+    dur_work = duration if g.active else 0
+    dur_break = 0 if g.active else duration
     cur.execute(
-        'SELECT id FROM log WHERE started = ? AND target = ?',
-        [started, target]
+        'SELECT id FROM log WHERE start = ? AND target = ?',
+        [g.start, g.target]
     )
     if not cur.fetchone():
         cur.execute(
-            'INSERT INTO log (target, started, ended,  duration, is_active) '
+            'INSERT INTO log (target, start, end,  work, break) '
             '   VALUES (?, ?, ?, ?, ?)',
-            [target, started, ended,  duration, is_active]
+            [g.target, g.start, last, dur_work, dur_break]
         )
         g.db.commit()
 
@@ -607,13 +605,10 @@ def str_secs(duration):
 def get_last_working(g):
     cursor = g.db.cursor()
     cursor.execute(
-        'SELECT started, ended, duration FROM log'
-        '   WHERE date(started)=date(?) AND is_active'
-        '   ORDER BY datetime(started) DESC',
-        [time.strftime(SQL_DATE, time.gmtime())]
+        'SELECT start, end, work FROM log'
+        '   WHERE start > strftime("%s", date("now")) AND work > 0'
+        '   ORDER BY start DESC'
     )
-
-    to_dt = lambda v: calendar.timegm(time.strptime(v, SQL_DATETIME))
     rows = cursor.fetchall()
     if g.active:
         period = time.time() - g.start
@@ -623,12 +618,12 @@ def get_last_working(g):
     if not rows:
         return period
 
-    if period and g.start - to_dt(rows[0][1]) > g.conf.off_timeout:
+    if period and g.start - rows[0][1] > g.conf.off_timeout:
         return period
 
     period += rows[0][2]
     for i in range(1, len(rows)):
-        if to_dt(rows[i-1][0]) - to_dt(rows[i][1]) > g.conf.off_timeout:
+        if rows[i-1][0] - rows[i][1] > g.conf.off_timeout:
             break
         period += rows[i][2]
     return period
@@ -636,59 +631,39 @@ def get_last_working(g):
 
 def get_report(g, interval=None):
     if not interval:
-        interval = [time.localtime()]
+        interval = [time.time()]
     if len(interval) == 1:
-        interval = interval * 2
+        interval = [interval[0], interval[0] + 24 * 60 * 60]
 
-    interval_str = [time.strftime('%x', i) for i in interval]
-
-    interval_utc = [
-        time.strftime(SQL_DATE, time.gmtime(time.mktime(i)))
-        for i in interval
-    ]
+    interval_str = [time.strftime('%x', time.localtime(i)) for i in interval]
 
     cursor = g.db.cursor()
-    duration_sql = lambda is_active: cursor.execute(
-        'SELECT target, SUM(duration) FROM log'
-        '   WHERE is_active=? AND date(started) BETWEEN date(?) AND date(?)'
+    cursor.execute(
+        'SELECT target, SUM(work), SUM(break) FROM log'
+        '   WHERE start BETWEEN ? AND ?'
         '   GROUP BY target'
         '   ORDER BY 2 DESC',
-        [str(1 if is_active else 0)] + interval_utc
+        interval
     )
 
-    duration_sql(False)
-    pauses = cursor.fetchall()
-    pauses_dict = dict(pauses)
-
-    duration_sql(True)
-    working = cursor.fetchall()
-    working_dict = dict(working)
+    rows = cursor.fetchall()
 
     if interval[0] == interval[1]:
         result = ['<b>Statistics for {}</b>'.format(interval_str[0])]
     else:
         result = ['<b>Statistics from {} to {}</b>'.format(*interval_str)]
 
+    total = lambda index: str_secs(sum(v[index] for v in rows))
     result += [
-        '  Total working: {}'.format(str_secs(sum(working_dict.values()))),
-        '  Total breaks: {}'.format(str_secs(sum(pauses_dict.values()))),
+        '  Totals: {} (and breaks: {})'.format(total(1), total(2))
     ]
-
-    if working:
-        result += ['\n  Working time with breaks:']
-        for target, dur in working:
-            pause = pauses_dict.pop(target, 0)
-            line = '    {}: {}'.format(target, str_secs(dur))
-            if pause:
-                line += ' (and breaks: {})'.format(str_secs(pause))
+    if rows:
+        result += ['\n  Details:']
+        for target, dur_work, dur_break  in rows:
+            line = '    {}: {}'.format(target, str_secs(dur_work))
+            if dur_break:
+                line += ' (and breaks: {})'.format(str_secs(dur_break))
             result += [line]
-
-    if pauses_dict:
-        result += ['\n  Breaks only:']
-        for target, dur in pauses:
-            if target not in pauses_dict:
-                continue
-            result += ['    {}: {}'.format(target, str_secs(dur))]
 
     result = '\n'.join(result)
     return result
@@ -701,7 +676,7 @@ def print_report(g, args):
             raise SystemExit('Wrong interval: second date less than first')
         interval = args.interval
 
-    result = get_report(g, interval)
+    result = get_report(g, [time.mktime(i) for i in interval])
     result = re.sub(r'<[^>]+>', '', result)
     print(result)
 
