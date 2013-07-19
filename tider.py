@@ -22,8 +22,8 @@ APP_DIRS = [
     os.path.join(os.path.expanduser('~'), '.config', 'tider')
 ]
 DEFAULTS = (
-    ('upd_period', ('500', 'int', 'in microseconds')),
-    ('off_timeout', ('60', 'int', 'in seconds')),
+    ('update_period', ('500', 'int', 'in microseconds')),
+    ('offline_timeout', ('60', 'int', 'in seconds')),
     ('min_duration', ('20',  'int', 'in seconds')),
     ('break_symbol', ('*', '', '')),
     ('height', ('20', 'int', '')),
@@ -256,7 +256,7 @@ def show_report(g):
         dialog.set_markup(g.stats)
         return True
 
-    GObject.timeout_add(g.conf.upd_period, update)
+    GObject.timeout_add(g.conf.update_period, update)
     dialog.run()
     dialog.destroy()
 
@@ -276,7 +276,7 @@ def create_ui(g):
         return True
 
     update()
-    GObject.timeout_add(g.conf.upd_period, lambda: not g.start or update())
+    GObject.timeout_add(g.conf.update_period, lambda: not g.start or update())
     return fixslots('UI', update=update, popup_menu=menu.popup_default)
 
 
@@ -492,7 +492,7 @@ def set_last_state(g):
         with open(g.path.stats, 'r') as f:
             g.stats = f.read()
 
-    if last and time.time() - last > g.conf.off_timeout:
+    if last and time.time() - last > g.conf.offline_timeout:
         disable(g, last=last)
 
 
@@ -620,7 +620,7 @@ def get_last_working(g):
 
     period = rows[0][2]
     for i in range(1, len(rows)):
-        if rows[i-1][0] - rows[i][1] > g.conf.off_timeout:
+        if rows[i-1][0] - rows[i][1] > g.conf.offline_timeout:
             break
         period += rows[i][2]
     return period
