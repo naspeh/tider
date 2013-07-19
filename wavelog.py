@@ -17,7 +17,6 @@ from gi.repository import Gdk, Gtk, GObject
 GObject.threads_init()
 
 SQL_DATE = '%Y-%m-%d'
-SQL_DATETIME = SQL_DATE + ' %H:%M:%S'
 APP_DIRS = [
     os.path.join(os.path.dirname(__file__), 'var'),
     os.path.join(os.path.expanduser('~'), '.config', 'wavelog')
@@ -400,12 +399,12 @@ def get_stats(g):
                 state='working' if g.active else 'break',
                 target=g.target,
                 started=time.strftime('%H:%M:%S', time.localtime(g.start)),
-                duration=str_secs(time.time() - g.start)
+                duration=str_seconds(time.time() - g.start)
             )
         )
     last_working = (
         '<b>Last working period: {}</b>'
-        .format(str_secs(get_last_working(g)))
+        .format(str_seconds(get_last_working(g)))
     )
     result = '\n\n'.join([result, last_working, get_report(g)])
     return result
@@ -533,8 +532,8 @@ def save_log(g, last=None):
         return
 
     cur = g.db.cursor()
-    dur_work = duration if g.active else 0
-    dur_break = 0 if g.active else duration
+    work_time = duration if g.active else 0
+    break_time = 0 if g.active else duration
     cur.execute(
         'SELECT id FROM log WHERE start = ? AND target = ?',
         [g.start, g.target]
@@ -543,7 +542,7 @@ def save_log(g, last=None):
         cur.execute(
             'INSERT INTO log (target, start, end,  work, break) '
             '   VALUES (?, ?, ?, ?, ?)',
-            [g.target, g.start, last, dur_work, dur_break]
+            [g.target, g.start, last, work_time, break_time]
         )
         g.db.commit()
 
@@ -594,7 +593,7 @@ def strip_tags(r):
     return re.sub(r'<[^>]+>', '', r)
 
 
-def str_secs(duration):
+def str_seconds(duration):
     hours = int(duration / 60 / 60)
     minutes = int(duration / 60 % 60)
     seconds = int(duration % 60)
@@ -613,17 +612,13 @@ def get_last_working(g):
     )
     rows = cursor.fetchall()
     if g.active:
-        period = time.time() - g.start
-    else:
-        period = 0
+        now = time.time()
+        rows.insert(0, (g.start, now, now - g.start))
 
     if not rows:
-        return period
+        return 0
 
-    if period and g.start - rows[0][1] > g.conf.off_timeout:
-        return period
-
-    period += rows[0][2]
+    period = rows[0][2]
     for i in range(1, len(rows)):
         if rows[i-1][0] - rows[i][1] > g.conf.off_timeout:
             break
@@ -633,38 +628,35 @@ def get_last_working(g):
 
 def get_report(g, interval=None):
     if not interval:
-        interval = [time.time()]
-    if len(interval) == 1:
-        interval = [interval[0], interval[0] + 24 * 60 * 60]
+        interval = [time.strftime(SQL_DATE)]
 
-    interval_str = [time.strftime('%x', time.localtime(i)) for i in interval]
+    if len(interval) == 1:
+        interval = interval * 2
 
     cursor = g.db.cursor()
     cursor.execute(
         'SELECT target, SUM(work), SUM(break) FROM log'
-        '   WHERE start BETWEEN ? AND ?'
+        '   WHERE date(start, "unixepoch", "localtime") BETWEEN ? AND ?'
         '   GROUP BY target'
         '   ORDER BY 2 DESC',
         interval
     )
-
     rows = cursor.fetchall()
 
     if interval[0] == interval[1]:
-        result = ['<b>Statistics for {}</b>'.format(interval_str[0])]
+        result = ['<b>Statistics for {}</b>'.format(interval[0])]
     else:
-        result = ['<b>Statistics from {} to {}</b>'.format(*interval_str)]
+        result = ['<b>Statistics from {} to {}</b>'.format(*interval)]
 
-    total = lambda index: str_secs(sum(v[index] for v in rows))
-    result += [
-        '  Totals: {} (and breaks: {})'.format(total(1), total(2))
-    ]
+    total = lambda index: str_seconds(sum(v[index] for v in rows))
+    result += ['  Totals: {} (and breaks: {})'.format(total(1), total(2))]
+
     if rows:
         result += ['\n  Details:']
-        for target, dur_work, dur_break in rows:
-            line = '    {}: {}'.format(target, str_secs(dur_work))
-            if dur_break:
-                line += ' (and breaks: {})'.format(str_secs(dur_break))
+        for target, work_time, break_time in rows:
+            line = '    {}: {}'.format(target, str_seconds(work_time))
+            if break_time:
+                line += ' (and breaks: {})'.format(str_seconds(break_time))
             result += [line]
 
     result = '\n'.join(result)
@@ -672,12 +664,12 @@ def get_report(g, interval=None):
 
 
 def print_report(g, args):
-    interval = []
+    interval = None
     if args.interval:
         if len(args.interval) == 2 and args.interval[0] > args.interval[1]:
             raise SystemExit('Wrong interval: second date less than first')
         interval = args.interval
-    result = get_report(g, [time.mktime(i) for i in interval])
+    result = get_report(g, [time.strftime(SQL_DATE, i) for i in interval])
     result = re.sub(r'<[^>]+>', '', result)
     print(result)
 
