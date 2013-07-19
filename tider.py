@@ -19,7 +19,7 @@ GObject.threads_init()
 SQL_DATE = '%Y-%m-%d'
 APP_DIRS = [
     os.path.join(os.path.dirname(__file__), 'var'),
-    os.path.join(os.path.expanduser('~'), '.config', 'wavelog')
+    os.path.join(os.path.expanduser('~'), '.config', 'tider')
 ]
 DEFAULTS = (
     ('upd_period', ('500', 'int', 'in microseconds')),
@@ -36,7 +36,7 @@ DEFAULTS = (
 )
 
 
-def wavelog():
+def tider():
     g = get_context()
     g.ui = create_ui(g)
 
@@ -49,7 +49,7 @@ def wavelog():
         Gtk.main()
     finally:
         disable(g)
-        print('Wavelog closed.')
+        print('Tider closed.')
 
 
 def get_config(file):
@@ -307,7 +307,7 @@ def create_win(g):
     box.add(img)
 
     win = Gtk.Window(
-        title='Wavelog', resizable=False, decorated=False,
+        title='Tider', resizable=False, decorated=False,
         skip_pager_hint=True, skip_taskbar_hint=True
     )
     win.set_keep_above(True)
@@ -388,7 +388,7 @@ def create_menu(g):
 
 def get_stats(g):
     if not g.start:
-        result = ('<b>Wavelog is disabled</b>')
+        result = ('<b>Tider is disabled</b>')
     else:
         result = (
             '<b><big>Currently {state}</big></b>\n'
@@ -701,7 +701,7 @@ def main(args=None):
         args = sys.argv[1:]
 
     if not args:
-        wavelog()
+        tider()
         return
 
     g = get_context()
