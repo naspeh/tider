@@ -107,6 +107,7 @@ def get_context():
         conf=get_config(paths.conf),
         db=connect_db(paths.db),
         start=None,
+        last=None,
         active=False,
         target=None,
         stats=None,
@@ -146,9 +147,10 @@ def fixslots(name, **fields):
     return cls(**fields)
 
 
-def disable(g, last=None):
-    save_log(g, last=last)
+def disable(g):
+    save_log(g)
     g.start = None
+    g.last = None
     g.active = False
     update_img(g)
 
@@ -411,17 +413,18 @@ def get_stats(g):
 
 
 def update_img(g):
-    duration_sec = 0
-    if g.start:
-        duration_sec = int(time.time() - g.start)
-    duration = time.gmtime(duration_sec)
+    if g.last and time.time() - g.last > g.conf.offline_timeout:
+        return disable(g)
+    else:
+        g.last = time.time()
 
+    duration = split_seconds(int(g.last - g.start) if g.start else 0)
     if not g.start:
         duration_text = ''
         target_text = 'OFF'
     else:
         target_text = g.target
-        duration_text = '{}:{:02d}'.format(duration.tm_hour, duration.tm_min)
+        duration_text = '{}:{:02d}'.format(duration.h, duration.m)
 
     max_h = max(12, g.conf.height)
     max_w = int(max_h * 4)
@@ -463,7 +466,7 @@ def update_img(g):
     line_h = padding * 0.7
     step_sec = 2
     step_w = timer_w * step_sec / 60
-    duration_w = int(duration.tm_sec / step_sec) * step_w
+    duration_w = int(duration.s / step_sec) * step_w
     ctx.set_line_width(line_h)
     ctx.set_source_rgb(0, 0, 0.7)
     ctx.move_to(timer_w, max_h - line_h / 2)
@@ -475,7 +478,7 @@ def update_img(g):
     g.stats = get_stats(g)
 
     with open(g.path.last, 'wb') as f:
-        f.write(pickle.dumps([g.target, g.active, g.start, time.time()]))
+        f.write(pickle.dumps([g.target, g.active, g.start, g.last]))
 
     with open(g.path.stats, 'w') as f:
         f.write(g.stats)
@@ -483,17 +486,15 @@ def update_img(g):
 
 
 def set_last_state(g):
-    last = None
     if os.path.exists(g.path.last):
         with open(g.path.last, 'rb') as f:
-            g.target, g.active, g.start, last = pickle.load(f)
+            g.target, g.active, g.start, g.last = pickle.load(f)
 
     if os.path.exists(g.path.stats):
         with open(g.path.stats, 'r') as f:
             g.stats = f.read()
 
-    if last and time.time() - last > g.conf.offline_timeout:
-        disable(g, last=last)
+    update_img(g)
 
 
 def connect_db(db_path):
@@ -520,14 +521,11 @@ def connect_db(db_path):
     return db
 
 
-def save_log(g, last=None):
+def save_log(g):
     if not g.start:
         return
 
-    if not last:
-        last = time.time()
-
-    duration = int(last - g.start)
+    duration = int(g.last - g.start)
     if duration < g.conf.min_duration:
         return
 
@@ -542,7 +540,7 @@ def save_log(g, last=None):
         cur.execute(
             'INSERT INTO log (target, start, end,  work, break) '
             '   VALUES (?, ?, ?, ?, ?)',
-            [g.target, g.start, last, work_time, break_time]
+            [g.target, g.start, g.last, work_time, break_time]
         )
         g.db.commit()
 
@@ -593,13 +591,21 @@ def strip_tags(r):
     return re.sub(r'<[^>]+>', '', r)
 
 
-def str_seconds(duration):
-    hours = int(duration / 60 / 60)
-    minutes = int(duration / 60 % 60)
-    seconds = int(duration % 60)
-    result = '{}h '.format(hours) if hours else ''
-    result += '{:02d}m '.format(minutes) if hours or minutes else ''
-    result += '{:02d}s'.format(seconds)
+def split_seconds(duration):
+    return fixslots(
+        'Duration',
+        h=int(duration / 60 / 60),
+        m=int(duration / 60 % 60),
+        s=int(duration % 60),
+        total=duration
+    )
+
+
+def str_seconds(duration, as_tuple=False):
+    time = split_seconds(duration)
+    result = '{}h '.format(time.h) if time.h else ''
+    result += '{:02d}m '.format(time.m) if time.h or time.m else ''
+    result += '{:02d}s'.format(time.s)
     return result
 
 
