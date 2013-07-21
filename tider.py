@@ -152,7 +152,10 @@ def disable(g):
     g.start = None
     g.last = None
     g.active = False
-    update_img(g)
+    if g.ui:
+        g.ui.update()
+    else:
+        update_img(g)
 
 
 def set_activity(g, active, target=None, new=True):
@@ -165,6 +168,7 @@ def set_activity(g, active, target=None, new=True):
     if new:
         save_log(g)
         g.start = time.time()
+        g.last = None
 
     g.target = target
     g.active = active
