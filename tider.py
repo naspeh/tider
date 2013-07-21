@@ -33,6 +33,9 @@ DEFAULTS = (
     ('hide_win', ('no', 'boolean', '')),
     ('win_move_x', (None, 'int', '')),
     ('win_move_y', (None, 'int', '')),
+    ('xfce_enable', ('no', 'boolean', '')),
+    ('xfce_tooltip', ('yes', 'boolean', '')),
+    ('xfce_click', ('no', 'boolean', '')),
 )
 
 
@@ -88,7 +91,6 @@ def get_paths():
     app_dir = app_dir + os.path.sep
     return fixslots(
         'Paths',
-        root=app_dir,
         conf=app_dir + 'config.ini',
         sock=app_dir + 'server.sock',
         db=app_dir + 'log.db',
@@ -96,6 +98,7 @@ def get_paths():
         img_tmp=app_dir + 'status-tmp.png',
         last=app_dir + 'last.txt',
         stats=app_dir + 'stats.txt',
+        xfce=app_dir + 'xfce.txt',
     )
 
 
@@ -486,6 +489,9 @@ def update_img(g):
 
     with open(g.path.stats, 'w') as f:
         f.write(g.stats)
+
+    if g.conf.xfce_enable:
+        prepare_xfce(g)
     return True
 
 
@@ -673,6 +679,18 @@ def get_report(g, interval=None):
     return result
 
 
+def prepare_xfce(g):
+    result = '<img>{}</img>'.format(g.path.img)
+    if g.conf.xfce_click:
+        click = 'python {} do {}'.format(__file__, g.conf.xfce_click)
+        result += '<click>{}</click>'.format(click)
+    if g.conf.xfce_tooltip:
+        result += '<tool>{}</tool>'.format(strip_tags(g.stats))
+
+    with open(g.path.xfce, 'w') as f:
+        f.write(result)
+
+
 def print_report(g, args):
     interval = None
     if args.interval:
@@ -681,18 +699,6 @@ def print_report(g, args):
         interval = args.interval
     result = get_report(g, [time.strftime(SQL_DATE, i) for i in interval])
     result = re.sub(r'<[^>]+>', '', result)
-    print(result)
-
-
-def print_xfce4(g, args):
-    result = '<img>{}</img>'.format(g.path.img)
-    if args.click:
-        click = 'python {} do {}'.format(__file__, args.click)
-        result += '<click>{}</click>'.format(click)
-    if args.tooltip and not args.echo:
-        result += '<tool>{}</tool>'.format(strip_tags(g.stats))
-    if args.echo:
-        result = 'echo "{}"'.format(result)
     print(result)
 
 
@@ -742,20 +748,10 @@ def main(args=None):
     )
 
     # xfce4 integration
-    sub_xfce4 = subs.add_parser(
-        'xfce4', help='command for xfce4-genmon-plugin'
+    sub_xfce = subs.add_parser(
+        'xfce', help='print command for xfce4-genmon-plugin'
     )
-    sub_xfce4.set_defaults(func=lambda: print_xfce4(g, args))
-    sub_xfce4.add_argument(
-        '-e', '--echo', action='store_true', help='use `echo` command'
-    )
-    sub_xfce4.add_argument(
-        '-c', '--click', choices=['menu', 'target'],
-        help='show (menu|target) dialog on click'
-    )
-    sub_xfce4.add_argument(
-        '-t', '--tooltip', action='store_true', help='show tooltip'
-    )
+    sub_xfce.set_defaults(func=lambda: print('cat {}'.format(g.path.xfce)))
 
     # config example
     sub_conf = subs.add_parser('conf', help='print config example')
