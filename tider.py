@@ -9,6 +9,7 @@ import subprocess
 import sys
 import time
 from configparser import ConfigParser
+from contextlib import contextmanager
 from threading import Thread
 
 import cairo as C
@@ -95,7 +96,6 @@ def get_paths():
         sock=app_dir + 'server.sock',
         db=app_dir + 'log.db',
         img=app_dir + 'status.png',
-        img_tmp=app_dir + 'status-tmp.png',
         last=app_dir + 'last.txt',
         stats=app_dir + 'stats.txt',
         xfce=app_dir + 'xfce.txt',
@@ -480,9 +480,9 @@ def update_img(g):
     ctx.line_to(timer_w - duration_w, max_h - line_h / 2)
     ctx.stroke()
 
-    src.write_to_png(g.path.img_tmp)
-    os.rename(g.path.img_tmp, g.path.img)
     g.stats = get_stats(g)
+    with tmp_file(g.path.img) as filename:
+        src.write_to_png(filename)
 
     with open(g.path.last, 'wb') as f:
         f.write(pickle.dumps([g.target, g.active, g.start, g.last]))
@@ -597,6 +597,18 @@ def send_action(g, action):
     s.close()
 
 
+@contextmanager
+def tmp_file(filename, suffix='.tmp', mode=None):
+    '''Manipulate the tmp file and then quickly rename to `filename`'''
+    tmp = filename + suffix
+    if mode:
+        with open(tmp, mode) as f:
+            yield f
+    else:
+        yield tmp
+    os.rename(tmp, filename)
+
+
 def strip_tags(r):
     return re.sub(r'<[^>]+>', '', r)
 
@@ -687,7 +699,7 @@ def prepare_xfce(g):
     if g.conf.xfce_tooltip:
         result += '<tool>{}</tool>'.format(strip_tags(g.stats))
 
-    with open(g.path.xfce, 'w') as f:
+    with tmp_file(g.path.xfce, mode='w') as f:
         f.write(result)
 
 
