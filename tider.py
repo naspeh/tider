@@ -677,12 +677,10 @@ def get_report(g, interval=None):
         result = ['<b>Statistics from {} to {}</b>'.format(*interval)]
 
     total = lambda index: str_seconds(sum(v[index] for v in rows))
-    result += ['  Totals: {} (and breaks: {})'.format(total(1), total(2))]
-
+    result += ['  Totals: {} (and breaks: {})\n'.format(total(1), total(2))]
     if rows:
-        result += ['\n  Details:']
         for target, work_time, break_time in rows:
-            line = '    {}: {}'.format(target, str_seconds(work_time))
+            line = '  {}: {}'.format(target, str_seconds(work_time))
             if break_time:
                 line += ' (and breaks: {})'.format(str_seconds(break_time))
             result += [line]
@@ -708,8 +706,8 @@ def print_report(g, args):
     if args.interval:
         if len(args.interval) == 2 and args.interval[0] > args.interval[1]:
             raise SystemExit('Wrong interval: second date less than first')
-        interval = args.interval
-    result = get_report(g, [time.strftime(SQL_DATE, i) for i in interval])
+        interval = [time.strftime(SQL_DATE, i) for i in args.interval]
+    result = get_report(g, interval)
     result = re.sub(r'<[^>]+>', '', result)
     print(result)
 
