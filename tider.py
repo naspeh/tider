@@ -27,8 +27,9 @@ DEFAULTS = (
     ('offline_timeout', ('60', 'int', 'in seconds')),
     ('min_duration', ('20',  'int', 'in seconds')),
     ('break_symbol', ('*', '', '')),
-    ('break_period', ('10', 'int', 'in minutes')),
-    ('work_period', ('50', 'int', 'in minutes')),
+    ('break_period', ('600', 'int', 'in seconds')),
+    ('work_period', ('3000', 'int', 'in seconds')),
+    ('overwork_period', ('300', 'int', 'in seconds')),
     ('height', ('20', 'int', '')),
     ('width', (None, 'int', '')),
     ('font_size', (None, 'int', '')),
@@ -117,6 +118,7 @@ def get_context():
         target=None,
         stats=None,
         ui=None,
+        last_overwork=None,
     )
     set_last_state(g)
     return g
@@ -510,6 +512,25 @@ def update_img(g):
 
     if g.conf.xfce_enable:
         prepare_xfce(g)
+
+    if g.conf.overwork_period and g.active:
+        last_working, need_break = get_last_period(g, True)
+        if not need_break:
+            g.last_overwork = None
+        else:
+            overtime = int(last_working - g.conf.work_period)
+            if g.last_overwork:
+                timeout = time.time() - g.last_overwork
+            else:
+                timeout = overtime
+            if timeout > g.conf.overwork_period:
+                g.last_overwork = time.time()
+                subprocess.call(
+                    'notify-send -u normal -t 4000 "Tider" '
+                    '"<b>Take a break!</b> Overvorking {}"'
+                    .format(str_seconds(overtime)),
+                    shell=True
+                )
     return True
 
 
@@ -652,12 +673,12 @@ def str_seconds(duration, as_tuple=False):
 def get_last_period(g, active):
     if active:
         field = 'work'
-        timeout = g.conf.break_period * 60
-        max_period = g.conf.work_period * 60
+        timeout = g.conf.break_period
+        max_period = g.conf.work_period
     else:
         field = 'break'
-        timeout = g.conf.work_period * 60
-        max_period = g.conf.break_period * 60
+        timeout = g.conf.work_period
+        max_period = g.conf.break_period
 
     cursor = g.db.cursor()
     cursor.execute(
