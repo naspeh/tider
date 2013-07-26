@@ -733,7 +733,7 @@ def prepare_xfce(g):
         click = 'python {} do {}'.format(__file__, g.conf.xfce_click)
         result += '<click>{}</click>'.format(click)
     if g.conf.xfce_tooltip:
-        stats = re.sub(r'(?s)Statistics.*', '', g.stats)
+        stats = re.sub(r'(?s)\W*<b>Statistics.*', '', g.stats)
         result += '<tool>{}</tool>'.format(strip_tags(stats))
 
     with tmp_file(g.path.xfce, mode='w') as f:
