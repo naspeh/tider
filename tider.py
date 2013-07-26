@@ -397,7 +397,7 @@ def create_menu(g):
     return menu
 
 
-def get_stats(g):
+def get_stats(g, detailed=True):
     if not g.start:
         result = ('<b>Tider is disabled</b>')
     else:
@@ -424,7 +424,10 @@ def get_stats(g):
             last_working += '\n<b>Need a break!</b>'
         elif can_work:
             last_working += '\n<b>Can work again!</b>'
-    result = '\n\n'.join([result, last_working, get_report(g)])
+    result = [result, last_working]
+    if detailed:
+        result += [get_report(g)]
+    result = '\n\n'.join(result)
     return result
 
 
@@ -733,8 +736,7 @@ def prepare_xfce(g):
         click = 'python {} do {}'.format(__file__, g.conf.xfce_click)
         result += '<click>{}</click>'.format(click)
     if g.conf.xfce_tooltip:
-        stats = re.sub(r'(?s)\W*<b>Statistics.*', '', g.stats)
-        result += '<tool>{}</tool>'.format(strip_tags(stats))
+        result += '<tool>{}</tool>'.format(get_stats(g, detailed=False))
 
     with tmp_file(g.path.xfce, mode='w') as f:
         f.write(result)
