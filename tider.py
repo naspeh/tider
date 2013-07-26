@@ -27,6 +27,8 @@ DEFAULTS = (
     ('offline_timeout', ('60', 'int', 'in seconds')),
     ('min_duration', ('20',  'int', 'in seconds')),
     ('break_symbol', ('*', '', '')),
+    ('break_period', ('10', 'int', 'in minutes')),
+    ('work_period', ('50', 'int', 'in minutes')),
     ('height', ('20', 'int', '')),
     ('width', (None, 'int', '')),
     ('font_size', (None, 'int', '')),
@@ -411,10 +413,15 @@ def get_stats(g):
                 duration=str_seconds(time.time() - g.start)
             )
         )
+    last_working, overtime = get_last_period(g, True)
     last_working = (
         '<b>Last working period: {}</b>'
-        .format(str_seconds(get_last_working(g)))
+        .format(str_seconds(last_working))
     )
+    if overtime:
+        last_working += '\n<b>{}</b>'.format(
+            'Need a break!' if g.active else 'Can work again!'
+        )
     result = '\n\n'.join([result, last_working, get_report(g)])
     return result
 
@@ -442,9 +449,15 @@ def update_img(g):
     font_h = box_h * 0.77
     if g.conf.font_size:
         font_h = min(font_h, g.conf.font_size)
-    font_rgb = (0, 0, 0)
     timer_w = max_h * 1.5
-    color = (0.6, 0.9, 0.6) if g.active else (0.7, 0.7, 0.7)
+
+    if g.start:
+        color = (0.6, 0.9, 0.6) if g.active else (0.8, 0.8, 0.83)
+        overtime = get_last_period(g, g.active)[1]
+        text_color = (0.5, 0, 0) if overtime else (0, 0, 0.5)
+    else:
+        color = (0.7, 0.7, 0.7)
+        text_color = (0, 0, 0)
 
     src = C.ImageSurface(C.FORMAT_ARGB32, max_w, max_h)
     ctx = C.Context(src)
@@ -460,7 +473,7 @@ def update_img(g):
     ctx.rectangle(0, 0, timer_w + padding / 2, max_h)
     ctx.fill()
 
-    ctx.set_source_rgb(*font_rgb)
+    ctx.set_source_rgb(*text_color)
     ctx.set_font_size(font_h)
 
     text_w, text_h = ctx.text_extents(duration_text)[2:4]
@@ -475,7 +488,7 @@ def update_img(g):
     step_w = timer_w * step_sec / 60
     duration_w = int(duration.s / step_sec) * step_w
     ctx.set_line_width(line_h)
-    ctx.set_source_rgb(0, 0, 0.7)
+    ctx.set_source_rgb(*text_color)
     ctx.move_to(timer_w, max_h - line_h / 2)
     ctx.line_to(timer_w - duration_w, max_h - line_h / 2)
     ctx.stroke()
@@ -631,15 +644,24 @@ def str_seconds(duration, as_tuple=False):
     return result
 
 
-def get_last_working(g):
+def get_last_period(g, active):
+    if active:
+        field = 'work'
+        timeout = g.conf.break_period * 60
+        max_period = g.conf.work_period * 60
+    else:
+        field = 'break'
+        timeout = g.conf.work_period * 60
+        max_period = g.conf.break_period * 60
+
     cursor = g.db.cursor()
     cursor.execute(
-        'SELECT start, end, work FROM log'
-        '   WHERE start > strftime("%s", date("now")) AND work > 0'
-        '   ORDER BY start DESC'
+        'SELECT start, end, {0} FROM log'
+        '   WHERE start > strftime("%s", date("now")) AND {0} > 0'
+        '   ORDER BY start DESC'.format(field)
     )
     rows = cursor.fetchall()
-    if g.active:
+    if g.active == active:
         now = time.time()
         rows.insert(0, (g.start, now, now - g.start))
 
@@ -648,10 +670,10 @@ def get_last_working(g):
 
     period = rows[0][2]
     for i in range(1, len(rows)):
-        if rows[i-1][0] - rows[i][1] > g.conf.offline_timeout:
+        if rows[i-1][0] - rows[i][1] > timeout:
             break
         period += rows[i][2]
-    return period
+    return period, period > max_period
 
 
 def get_report(g, interval=None):
@@ -676,8 +698,9 @@ def get_report(g, interval=None):
     else:
         result = ['<b>Statistics from {} to {}</b>'.format(*interval)]
 
-    total = lambda index: str_seconds(sum(v[index] for v in rows))
-    result += ['  Totals: {} (and breaks: {})\n'.format(total(1), total(2))]
+    if len(rows) != 1:
+        total = lambda index: str_seconds(sum(v[index] for v in rows))
+        result += ['  Totals: {} (and breaks: {})'.format(total(1), total(2))]
     if rows:
         for target, work_time, break_time in rows:
             line = '  {}: {}'.format(target, str_seconds(work_time))
