@@ -701,15 +701,14 @@ def get_report(g, interval=None):
     details = []
     if len(rows) != 1:
         total = lambda index: str_seconds(sum(v[index] for v in rows))
-        details += ['Totals: {} (and breaks: {})'.format(total(1), total(2))]
+        details += ['Totals: {} (and breaks: {})\n'.format(total(1), total(2))]
     if rows:
-        width = max(len(r[0]) for r in rows)
         for target, work_time, break_time in rows:
-            line = '{}: {}'.format(target.rjust(width), str_seconds(work_time))
+            line = '{}: {}'.format(target, str_seconds(work_time))
             if break_time:
                 line += ' (and breaks: {})'.format(str_seconds(break_time))
             details += [line]
-    result += ['\n  | '.join(details)]
+    result += ['<tt>{}</tt>'.format('\n  | '.join(details))]
 
     result = '\n  '.join(result)
     return result
