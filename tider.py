@@ -505,7 +505,13 @@ def update_img(g):
         src.write_to_png(filename)
 
     with open(g.path.last, 'wb') as f:
-        f.write(pickle.dumps([g.target, g.active, g.start, g.last]))
+        f.write(pickle.dumps({
+            'target': g.target,
+            'active': g.active,
+            'start': g.start,
+            'last': g.last,
+            'last_overwork': g.last_overwork
+        }))
 
     with open(g.path.stats, 'w') as f:
         f.write(g.stats)
@@ -523,12 +529,17 @@ def update_img(g):
                 timeout = time.time() - g.last_overwork
             else:
                 timeout = overtime
-            if timeout > g.conf.overwork_period:
+            if timeout >= g.conf.overwork_period:
                 g.last_overwork = time.time()
                 subprocess.call(
-                    'notify-send -u normal -t 4000 "Tider" '
-                    '"<b>Take a break!</b> Overvorking {}"'
-                    .format(str_seconds(overtime)),
+                    'notify-send -u critical -i {} '
+                    '"Take a break!" '
+                    '"Working: <b>{}</b>.\nOverworking: <b>{}</b>"'
+                    .format(
+                        g.path.img,
+                        str_seconds(last_working),
+                        str_seconds(overtime)
+                    ),
                     shell=True
                 )
     return True
@@ -537,7 +548,8 @@ def update_img(g):
 def set_last_state(g):
     if os.path.exists(g.path.last):
         with open(g.path.last, 'rb') as f:
-            g.target, g.active, g.start, g.last = pickle.load(f)
+            state = pickle.load(f)
+            g._replace(**state)
 
     if os.path.exists(g.path.stats):
         with open(g.path.stats, 'r') as f:
