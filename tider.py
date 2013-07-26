@@ -532,7 +532,7 @@ def update_img(g):
             if timeout >= g.conf.overwork_period:
                 g.last_overwork = time.time()
                 subprocess.call(
-                    'notify-send -u critical -i {} '
+                    'notify-send -i {} '
                     '"Take a break!" '
                     '"Working: <b>{}</b>.\nOverworking: <b>{}</b>"'
                     .format(
