@@ -698,17 +698,29 @@ def get_report(g, interval=None):
     else:
         result = ['<b>Statistics from {} to {}</b>'.format(*interval)]
 
-    details = []
-    if len(rows) != 1:
+    if len(rows) == 1:
+        row = rows[0]
+        line = '{}: {}'.format(row[0], str_seconds(row[1]))
+        if row[2]:
+            line += ' (and breaks: {})'.format(str_seconds(row[2]))
+        result += [line]
+    if len(rows) > 1:
+        details = []
         total = lambda index: str_seconds(sum(v[index] for v in rows))
         details += ['Totals: {} (and breaks: {})\n'.format(total(1), total(2))]
-    if rows:
+
+        header = ('target', 'work', 'break')
+        width = max([len(header[0])] + [len(r[0]) for r in rows])
+        pattern = '|{:>%s}|{:>11}|{:>11}|' % width
+        details += [
+            pattern.format(*header),
+            '|%s|' % '+'.join(['-' * width] + ['-' * 11] * 2)
+        ]
         for target, work_time, break_time in rows:
-            line = '{}: {}'.format(target, str_seconds(work_time))
-            if break_time:
-                line += ' (and breaks: {})'.format(str_seconds(break_time))
-            details += [line]
-    result += ['<tt>{}</tt>'.format('\n  | '.join(details))]
+            details += [pattern.format(
+                target, str_seconds(work_time), str_seconds(break_time)
+            )]
+        result += ['<tt>{}</tt>'.format('\n  '.join(details))]
 
     result = '\n  '.join(result)
     return result
