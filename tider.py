@@ -413,15 +413,17 @@ def get_stats(g):
                 duration=str_seconds(time.time() - g.start)
             )
         )
-    last_working, overtime = get_last_period(g, True)
+    last_working, need_break = get_last_period(g, True)
     last_working = (
         '<b>Last working period: {}</b>'
         .format(str_seconds(last_working))
     )
-    if overtime:
-        last_working += '\n<b>{}</b>'.format(
-            'Need a break!' if g.active else 'Can work again!'
-        )
+    if need_break:
+        last_break, can_work = get_last_period(g, False)
+        if g.active:
+            last_working += '\n<b>Need a break!</b>'
+        elif can_work:
+            last_working += '\n<b>Can work again!</b>'
     result = '\n\n'.join([result, last_working, get_report(g)])
     return result
 
@@ -661,7 +663,7 @@ def get_last_period(g, active):
         '   ORDER BY start DESC'.format(field)
     )
     rows = cursor.fetchall()
-    if g.active == active:
+    if g.start and g.active == active:
         now = time.time()
         rows.insert(0, (g.start, now, now - g.start))
 
@@ -731,7 +733,8 @@ def prepare_xfce(g):
         click = 'python {} do {}'.format(__file__, g.conf.xfce_click)
         result += '<click>{}</click>'.format(click)
     if g.conf.xfce_tooltip:
-        result += '<tool>{}</tool>'.format(strip_tags(g.stats))
+        stats = re.sub(r'(?s)Statistics.*', '', g.stats)
+        result += '<tool>{}</tool>'.format(strip_tags(stats))
 
     with tmp_file(g.path.xfce, mode='w') as f:
         f.write(result)
