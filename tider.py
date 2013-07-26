@@ -12,7 +12,7 @@ from configparser import ConfigParser
 from contextlib import contextmanager
 from threading import Thread
 
-import cairo as C
+import cairo
 from gi.repository import Gdk, Gtk, GObject
 
 GObject.threads_init()
@@ -431,6 +431,7 @@ def update_img(g):
         return disable(g)
     else:
         g.last = time.time()
+    g.stats = get_stats(g)
 
     duration = split_seconds(int(g.last - g.start) if g.start else 0)
     if not g.start:
@@ -459,8 +460,8 @@ def update_img(g):
         color = (0.7, 0.7, 0.7)
         text_color = (0, 0, 0)
 
-    src = C.ImageSurface(C.FORMAT_ARGB32, max_w, max_h)
-    ctx = C.Context(src)
+    src = cairo.ImageSurface(cairo.FORMAT_ARGB32, max_w, max_h)
+    ctx = cairo.Context(src)
 
     ctx.set_source_rgb(1, 1, 1)
     ctx.rectangle(0, 0, max_w, max_h)
@@ -493,7 +494,6 @@ def update_img(g):
     ctx.line_to(timer_w - duration_w, max_h - line_h / 2)
     ctx.stroke()
 
-    g.stats = get_stats(g)
     with tmp_file(g.path.img) as filename:
         src.write_to_png(filename)
 
@@ -580,9 +580,9 @@ def run_server(g):
         conn, addr = s.accept()
         while True:
             data = conn.recv(1024)
-            GObject.idle_add(call_action, g, data.decode())
             if not data:
                 break
+            GObject.idle_add(call_action, g, data.decode())
 
     conn.close()
 
