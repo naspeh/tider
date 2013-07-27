@@ -42,6 +42,8 @@ DEFAULTS = (
     ('xfce_click', ('no', 'boolean', '')),
 )
 
+strip_tags = lambda r: re.sub(r'<[^>]+>', '', r)
+
 
 def tider():
     g = get_context()
@@ -79,7 +81,7 @@ def get_config(file):
         else:
             conf[k] = None
 
-    return fixslots('Conf', **conf)
+    return fix_slots('Conf', **conf)
 
 
 def get_paths():
@@ -93,7 +95,7 @@ def get_paths():
         os.mkdir(app_dir)
 
     app_dir = app_dir + os.path.sep
-    return fixslots(
+    return fix_slots(
         'Paths',
         conf=app_dir + 'config.ini',
         sock=app_dir + 'server.sock',
@@ -107,7 +109,7 @@ def get_paths():
 
 def get_context():
     paths = get_paths()
-    g = fixslots(
+    g = fix_slots(
         'Context',
         path=paths,
         conf=get_config(paths.conf),
@@ -148,7 +150,7 @@ class _FixedSlots:
         )
 
 
-def fixslots(name, **fields):
+def fix_slots(name, **fields):
     cls = type(name, (_FixedSlots, ), {})
     cls.__slots__ = fields.keys()
     return cls(**fields)
@@ -290,7 +292,7 @@ def create_ui(g):
 
     update()
     GObject.timeout_add(g.conf.update_period, lambda: not g.start or update())
-    return fixslots('UI', update=update, popup_menu=menu.popup_default)
+    return fix_slots('UI', update=update, popup_menu=menu.popup_default)
 
 
 def create_tray(g, menu):
@@ -525,20 +527,16 @@ def update_img(g):
             g.last_overwork = None
         else:
             overtime = int(last_working - g.conf.work_period)
-            if g.last_overwork:
-                timeout = time.time() - g.last_overwork
-            else:
-                timeout = overtime
+            last = g.last_overwork
+            timeout = time.time() - last if last else overtime
             if timeout >= g.conf.overwork_period:
                 g.last_overwork = time.time()
                 subprocess.call(
-                    'notify-send -i {} '
-                    '"Take a break!" '
+                    'notify-send -i {} -t {} "Take a break!" '
                     '"Working: <b>{}</b>.\nOverworking: <b>{}</b>"'
                     .format(
-                        g.path.img,
-                        str_seconds(last_working),
-                        str_seconds(overtime)
+                        g.path.img, g.conf.overwork_period * 1000 * 0.9,
+                        str_seconds(last_working), str_seconds(overtime)
                     ),
                     shell=True
                 )
@@ -660,12 +658,8 @@ def tmp_file(filename, suffix='.tmp', mode=None):
     os.rename(tmp, filename)
 
 
-def strip_tags(r):
-    return re.sub(r'<[^>]+>', '', r)
-
-
 def split_seconds(duration):
-    return fixslots(
+    return fix_slots(
         'Duration',
         h=int(duration / 60 / 60),
         m=int(duration / 60 % 60),
