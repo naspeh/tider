@@ -704,7 +704,7 @@ def get_last_period(g, active):
         rows.insert(0, (g.start, now, now - g.start))
 
     if not rows:
-        return 0
+        return 0, False
 
     period = rows[0][2]
     for i in range(1, len(rows)):
