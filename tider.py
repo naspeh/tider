@@ -782,7 +782,18 @@ def print_report(g, args):
         if len(args.interval) == 2 and args.interval[0] > args.interval[1]:
             raise SystemExit('Wrong interval: second date less than first')
         interval = [time.strftime(SQL_DATE, i) for i in args.interval]
-    result = get_report(g, interval)
+    if args.daily and len(args.interval):
+        result = []
+        begin = time.mktime(args.interval[0])
+        end = time.mktime(args.interval[1])
+        day = 60 * 60 * 24
+        for i in range(int((end - begin) / day)):
+            current = time.strftime(SQL_DATE, time.localtime(begin + i * day))
+            result += [get_report(g, [current])]
+        result += [get_report(g, interval)]
+        result = '\n\n'.join(result)
+    else:
+        result = get_report(g, interval)
     result = re.sub(r'<[^>]+>', '', result)
     print(result)
 
@@ -830,6 +841,9 @@ def main(args=None):
         '-i', '--interval',
         help='date interval as "YYYYMMDD" or "YYYYMMDD-YYYYMMDD"',
         type=lambda v: [time.strptime(i, '%Y%m%d') for i in v.split('-', 1)]
+    )
+    sub_report.add_argument(
+        '-d', '--daily', action='store_true', help='daily report'
     )
 
     # xfce4 integration
