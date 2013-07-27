@@ -770,24 +770,40 @@ def prepare_xfce(g):
         f.write(result)
 
 
+def parse_interval(interval):
+    if len(interval) == 2 and interval[0] > interval[1]:
+        raise SystemExit('Wrong interval: second date less than first')
+
+    result = None
+    for prefix in ['', '%Y%m', '%Y']:
+        try:
+            value = [time.strftime(prefix + i) for i in interval.split('-', 1)]
+            result = [time.strptime(i, '%Y%m%d') for i in value]
+            break
+        except ValueError:
+            pass
+
+    if not result:
+        raise SystemExit('Wrong interval format')
+    return result
+
+
 def print_report(g, args):
-    interval = None
+    interval = result = []
     if args.interval:
-        if len(args.interval) == 2 and args.interval[0] > args.interval[1]:
-            raise SystemExit('Wrong interval: second date less than first')
-        interval = [time.strftime(SQL_DATE, i) for i in args.interval]
-    if args.daily and len(args.interval):
+        interval_ = parse_interval(args.interval)
+        interval = [time.strftime(SQL_DATE, i) for i in interval_]
+    if args.daily and len(interval) == 2:
         result = []
-        begin = time.mktime(args.interval[0])
-        end = time.mktime(args.interval[1])
+        begin = time.mktime(interval_[0])
+        end = time.mktime(interval_[1])
         day = 60 * 60 * 24
         for i in range(int((end - begin) / day)):
             current = time.strftime(SQL_DATE, time.localtime(begin + i * day))
             result += [get_report(g, [current])]
-        result += [get_report(g, interval)]
-        result = '\n\n'.join(result)
-    else:
-        result = get_report(g, interval)
+
+    result += [get_report(g, interval)]
+    result = '\n\n'.join(result)
     result = re.sub(r'<[^>]+>', '', result)
     print(result)
 
@@ -833,8 +849,7 @@ def main(args=None):
     sub_report.set_defaults(func=lambda: print_report(g, args))
     sub_report.add_argument(
         '-i', '--interval',
-        help='date interval as "YYYYMMDD" or "YYYYMMDD-YYYYMMDD"',
-        type=lambda v: [time.strptime(i, '%Y%m%d') for i in v.split('-', 1)]
+        help='date interval: "YYYYMMDD", "MMDD", "DD" and pair via "-"',
     )
     sub_report.add_argument(
         '-d', '--daily', action='store_true', help='daily report'
