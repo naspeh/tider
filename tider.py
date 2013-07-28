@@ -535,7 +535,7 @@ def update_img(g):
                     'notify-send -i {} -t {} "Take a break!" '
                     '"Working: <b>{}</b>.\nOverworking: <b>{}</b>"'
                     .format(
-                        g.path.img, g.conf.overwork_period * 1000 * 0.9,
+                        g.path.img, int(g.conf.overwork_period * 500),
                         str_seconds(last_working), str_seconds(overtime)
                     ),
                     shell=True
