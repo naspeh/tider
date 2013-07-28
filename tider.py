@@ -372,13 +372,9 @@ def create_menu(g):
     quit.show()
 
     menu = Gtk.Menu()
-    menu.append(target)
-    menu.append(start)
-    menu.append(stop)
-    menu.append(off)
-    menu.append(stat)
-    menu.append(separator)
-    menu.append(quit)
+    items = [target, start, stop, off, stat, separator, quit]
+    for i in items:
+        menu.append(i)
 
     def update():
         if not g.start:
