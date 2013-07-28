@@ -624,18 +624,14 @@ def run_server(g):
 
 
 def call_action(g, action):
-    if action == 'target':
-        change_target(g)
-    elif action == 'toggle-active':
-        if not g.start:
-            return False
-        set_activity(g, not g.active)
-    elif action == 'disable':
-        disable(g)
-    elif action == 'quit':
-        Gtk.main_quit()
-    elif action == 'menu':
-        g.ui.popup_menu(None)
+    actions = {
+        'target': lambda: change_target(g),
+        'toggle-active': lambda: g.start and set_activity(g, not g.active),
+        'disable': lambda: disable(g),
+        'quit': lambda: Gtk.main_quit(),
+        'menu': lambda: g.ui.popup_menu(None),
+    }
+    actions.get(action)()
 
 
 def send_action(g, action):
