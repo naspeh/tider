@@ -675,7 +675,7 @@ def get_last_period(g, active):
     cursor = g.db.cursor()
     cursor.execute(
         'SELECT start, end, {0} FROM log'
-        '   WHERE start > strftime("%s", date("now")) AND {0} > 0'
+        '   WHERE start > strftime("%s", "now") - 24 * 60 * 60 AND {0} > 0'
         '   ORDER BY start DESC'.format(field)
     )
     rows = cursor.fetchall()
