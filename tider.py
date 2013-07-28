@@ -43,6 +43,7 @@ DEFAULTS = (
 )
 
 strip_tags = lambda r: re.sub(r'<[^>]+>', '', r)
+shell_call = lambda cmd: subprocess.call(cmd, shell=True)
 
 
 def tider():
@@ -531,14 +532,13 @@ def update_img(g):
             timeout = time.time() - last if last else overtime
             if timeout >= g.conf.overwork_period:
                 g.last_overwork = time.time()
-                subprocess.call(
+                shell_call(
                     'notify-send -i {} -t {} "Take a break!" '
                     '"Working: <b>{}</b>.\nOverworking: <b>{}</b>"'
                     .format(
                         g.path.img, int(g.conf.overwork_period * 500),
                         str_seconds(last_working), str_seconds(overtime)
-                    ),
-                    shell=True
+                    )
                 )
     return True
 
@@ -618,20 +618,17 @@ def run_server(g):
             data = conn.recv(1024)
             if not data:
                 break
-            GObject.idle_add(call_action, g, data.decode())
-
+            action = run_server.actions.get(data.decode())
+            GObject.idle_add(action, g)
     conn.close()
 
-
-def call_action(g, action):
-    actions = {
-        'target': lambda: change_target(g),
-        'toggle-active': lambda: g.start and set_activity(g, not g.active),
-        'disable': lambda: disable(g),
-        'quit': lambda: Gtk.main_quit(),
-        'menu': lambda: g.ui.popup_menu(None),
-    }
-    actions.get(action)()
+run_server.actions = {
+    'target': lambda g: change_target(g),
+    'toggle-active': lambda g: g.start and set_activity(g, not g.active),
+    'disable': lambda g: disable(g),
+    'quit': lambda g: Gtk.main_quit(),
+    'menu': lambda g: g.ui.popup_menu(None),
+}
 
 
 def send_action(g, action):
@@ -654,22 +651,19 @@ def tmp_file(filename, suffix='.tmp', mode=None):
     os.rename(tmp, filename)
 
 
-def split_seconds(duration):
+def split_seconds(v):
     return fix_slots(
-        'Duration',
-        h=int(duration / 60 / 60),
-        m=int(duration / 60 % 60),
-        s=int(duration % 60),
-        total=duration
+        'Duration', h=int(v / 60 / 60), m=int(v / 60 % 60), s=int(v % 60),
     )
 
 
-def str_seconds(duration, as_tuple=False):
+def str_seconds(duration):
     time = split_seconds(duration)
-    result = '{}h '.format(time.h) if time.h else ''
-    result += '{:02d}m '.format(time.m) if time.h or time.m else ''
-    result += '{:02d}s'.format(time.s)
-    return result
+    return (
+        '{}h '.format(time.h) if time.h else '' +
+        '{:02d}m '.format(time.m) if time.h or time.m else ''
+        '{:02d}s'.format(time.s)
+    )
 
 
 def get_last_period(g, active):
@@ -826,23 +820,25 @@ def main(args=None):
     parser = argparse.ArgumentParser()
     subs = parser.add_subparsers()
 
+    def sub(name, func, **kw):
+        cmd = subs.add_parser(name, **kw)
+        cmd.set_defaults(func=func)
+        return cmd
+
     # call action
-    sub_do = subs.add_parser('call', help='call a specific action')
-    sub_do.set_defaults(func=lambda: send_action(g, args.action))
+    sub_do = sub(
+        'call', help='call a specific action',
+        func=lambda: send_action(g, args.action)
+    )
     sub_do.add_argument(
-        'action', help='choice action',
-        choices=['target', 'menu', 'toggle-active', 'disable', 'quit']
+        'action', help='choice action', choices=run_server.actions.keys()
     )
 
-    # sqlite session
-    sub_db = subs.add_parser('db', help='enter to sqlite session')
-    sub_db.set_defaults(func=lambda: (
-        subprocess.call('sqlite3 {}'.format(g.path.db), shell=True)
-    ))
-
     # statistics
-    sub_report = subs.add_parser('report', aliases=['re'], help='print report')
-    sub_report.set_defaults(func=lambda: print_report(g, args))
+    sub_report = sub(
+        'report', aliases=['re'], help='print report',
+        func=lambda: print_report(g, args)
+    )
     sub_report.add_argument(
         '-i', '--interval',
         help='date interval: "YYYYMMDD", "MMDD", "DD" and pair via "-"',
@@ -851,15 +847,20 @@ def main(args=None):
         '-d', '--daily', action='store_true', help='daily report'
     )
 
-    # xfce4 integration
-    sub_xfce = subs.add_parser(
-        'xfce', help='print command for xfce4-genmon-plugin'
+    # sqlite session
+    sub(
+        'db', help='enter to sqlite session',
+        func=lambda: shell_call('sqlite3 {}'.format(g.path.db))
     )
-    sub_xfce.set_defaults(func=lambda: print('cat {}'.format(g.path.xfce)))
+
+    # xfce4 integration
+    sub(
+        'xfce', help='print command for xfce4-genmon-plugin',
+        func=lambda: print('cat {}'.format(g.path.xfce))
+    )
 
     # config example
-    sub_conf = subs.add_parser('conf', help='print config example')
-    sub_conf.set_defaults(func=print_conf)
+    sub('conf', help='print config example', func=print_conf)
 
     args = parser.parse_args(args)
     try:
