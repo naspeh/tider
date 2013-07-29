@@ -662,7 +662,7 @@ def str_seconds(duration):
     time = split_seconds(duration)
     return (
         '{}h '.format(time.h) if time.h else '' +
-        '{:02d}m '.format(time.m) if time.h or time.m else ''
+        '{:02d}m '.format(time.m) if time.h or time.m else '' +
         '{:02d}s'.format(time.s)
     )
 
