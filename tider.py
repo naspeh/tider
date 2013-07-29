@@ -324,7 +324,8 @@ def create_win(g):
 
     win = Gtk.Window(
         title='Tider', resizable=False, decorated=False,
-        skip_pager_hint=True, skip_taskbar_hint=True
+        skip_pager_hint=True, skip_taskbar_hint=True,
+        type=Gtk.WindowType.POPUP
     )
     win.set_keep_above(True)
     win.add(box)
@@ -337,7 +338,11 @@ def create_win(g):
     win.connect('delete_event', lambda w, e: Gtk.main_quit())
     box.connect('button-press-event', lambda w, e: g.ui.popup_menu(e))
 
-    win.update = lambda: img.set_from_file(g.path.img)
+    def update():
+        img.set_from_file(g.path.img)
+        img.set_tooltip_markup(g.stats)
+
+    win.update = update
     return win
 
 
@@ -530,7 +535,7 @@ def update_img(g):
                 g.last_overwork = time.time()
                 shell_call(
                     'notify-send -i {} -t {} "Take a break!" '
-                    '"Working: <b>{}</b>.\nOverworking: <b>{}</b>"'
+                    '"Working: <b>{}</b>\nOverworking: <b>{}</b>"'
                     .format(
                         g.path.img, int(g.conf.overwork_period * 500),
                         str_seconds(last_working), str_seconds(overtime)
