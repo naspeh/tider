@@ -42,6 +42,8 @@ DEFAULTS = (
     ('xfce_tooltip', ('yes', 'boolean', '')),
     ('xfce_click', ('no', 'boolean', '')),
     ('i3bar_enable', ('no', 'boolean', '')),
+    ('i3bar_working', ('#770000', '', 'color: #ff0000 - red, etc')),
+    ('i3bar_break', ('#777777', '', 'color: #ff0000 - red, etc'))
 )
 
 strip_tags = lambda r: re.sub(r'<[^>]+>', '', r)
@@ -529,14 +531,10 @@ def update_ui(g):
 
     if g.conf.i3bar_enable:
         duration_text = duration_text if g.start else 'Tider'
-        result = '[{} {}]'.format(duration_text, target)
-        if g.active:
-            color = '\#9933cc'
-        else:
-            color = '\#66cc99'
-        result = {'full_text': result, 'color': color}
+        full_text = '{} {}'.format(duration_text, target)
+        color = g.conf.i3bar_working if g.active else g.conf.i3bar_break
         with tmp_file(g.path.i3bar, mode='w') as f:
-            f.write(json.dumps(result))
+            f.write(json.dumps({'full_text': full_text, 'color': color}))
 
     if g.conf.overwork_period and g.active:
         last_working, need_break = get_last_period(g, True)
