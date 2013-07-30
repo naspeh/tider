@@ -42,6 +42,7 @@ DEFAULTS = (
     ('xfce_tooltip', ('yes', 'boolean', '')),
     ('xfce_click', ('no', 'boolean', '')),
     ('i3bar_enable', ('no', 'boolean', '')),
+    ('i3bar_tmpl', ('{duration} {target}', '', '')),
     ('i3bar_working', ('#770000', '', 'color: #ff0000 - red, etc')),
     ('i3bar_break', ('#777777', '', 'color: #ff0000 - red, etc'))
 )
@@ -530,8 +531,8 @@ def update_ui(g):
         prepare_xfce(g)
 
     if g.conf.i3bar_enable:
-        duration_text = duration_text if g.start else 'Tider'
-        full_text = '{} {}'.format(duration_text, target)
+        dur = duration_text if g.start else 'Tider'
+        full_text = g.conf.i3bar_tmpl.format(duration=dur, target=target)
         color = g.conf.i3bar_working if g.active else g.conf.i3bar_break
         with tmp_file(g.path.i3bar, mode='w') as f:
             f.write(json.dumps({'full_text': full_text, 'color': color}))
