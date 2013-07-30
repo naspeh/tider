@@ -450,9 +450,9 @@ def update_ui(g):
     duration = split_seconds(int(g.last - g.start) if g.start else 0)
     if not g.start:
         duration_text = ''
-        target_text = 'OFF'
+        target = 'OFF'
     else:
-        target_text = g.target
+        target = g.target if g.active else g.target + g.conf.break_symbol
         duration_text = '{}:{:02d}'.format(duration.h, duration.m)
 
     if g.conf.xfce_enable or not g.conf.hide_win:
@@ -497,7 +497,7 @@ def update_ui(g):
         ctx.show_text(duration_text)
 
         ctx.move_to(timer_w + padding, font_h + padding)
-        ctx.show_text(target_text)
+        ctx.show_text(target)
 
         line_h = padding * 0.7
         step_sec = 2
@@ -528,7 +528,6 @@ def update_ui(g):
         prepare_xfce(g)
 
     if g.conf.i3bar_enable:
-        target = target_text if g.active else target_text + '*'
         duration_text = duration_text if g.start else 'Tider'
         result = '[{} {}]'.format(duration_text, target)
         if g.active:
