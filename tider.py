@@ -43,7 +43,7 @@ DEFAULTS = (
     ('xfce_click', ('no', 'boolean', '')),
     ('i3bar_enable', ('no', 'boolean', '')),
     ('i3bar_tmpl', ('[{duration} {target}]', '', '')),
-    ('i3bar_working', ('#770000', '', 'color: #ff0000 - red, etc')),
+    ('i3bar_working', ('#007700', '', 'color: #ff0000 - red, etc')),
     ('i3bar_break', ('#777777', '', 'color: #ff0000 - red, etc'))
 )
 
