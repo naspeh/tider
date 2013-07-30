@@ -1,4 +1,5 @@
 import argparse
+import json
 import os
 import pickle
 import re
@@ -40,6 +41,7 @@ DEFAULTS = (
     ('xfce_enable', ('no', 'boolean', '')),
     ('xfce_tooltip', ('yes', 'boolean', '')),
     ('xfce_click', ('no', 'boolean', '')),
+    ('i3bar_enable', ('no', 'boolean', '')),
 )
 
 strip_tags = lambda r: re.sub(r'<[^>]+>', '', r)
@@ -105,6 +107,7 @@ def get_paths():
         last=app_dir + 'last.txt',
         stats=app_dir + 'stats.txt',
         xfce=app_dir + 'xfce.txt',
+        i3bar=app_dir + 'i3bar.txt'
     )
 
 
@@ -165,7 +168,7 @@ def disable(g):
     if g.ui:
         g.ui.update()
     else:
-        update_img(g)
+        update_ui(g)
 
 
 def set_activity(g, active, target=None, new=True):
@@ -182,7 +185,7 @@ def set_activity(g, active, target=None, new=True):
 
     g.target = target
     g.active = active
-    update_img(g)
+    update_ui(g)
 
 
 def get_completion(g):
@@ -283,7 +286,7 @@ def create_ui(g):
     tray = create_tray(g, menu) if not g.conf.hide_tray else None
 
     def update():
-        update_img(g)
+        update_ui(g)
         menu.update()
         if win:
             win.update()
@@ -437,7 +440,7 @@ def get_stats(g, detailed=True):
     return result
 
 
-def update_img(g):
+def update_ui(g):
     if g.last and time.time() - g.last > g.conf.offline_timeout:
         return disable(g)
     else:
@@ -452,61 +455,62 @@ def update_img(g):
         target_text = g.target
         duration_text = '{}:{:02d}'.format(duration.h, duration.m)
 
-    max_h = max(12, g.conf.height)
-    max_w = int(max_h * 4)
-    if g.conf.width:
-        max_w = max(max_w, g.conf.width)
-    padding = max_h * 0.125
-    box_h = max_h - 2 * padding
-    font_h = box_h * 0.77
-    if g.conf.font_size:
-        font_h = min(font_h, g.conf.font_size)
-    timer_w = max_h * 1.5
+    if g.conf.xfce_enable or not g.conf.hide_win:
+        max_h = max(12, g.conf.height)
+        max_w = int(max_h * 4)
+        if g.conf.width:
+            max_w = max(max_w, g.conf.width)
+        padding = max_h * 0.125
+        box_h = max_h - 2 * padding
+        font_h = box_h * 0.77
+        if g.conf.font_size:
+            font_h = min(font_h, g.conf.font_size)
+        timer_w = max_h * 1.5
 
-    if g.start:
-        color = (0.6, 0.9, 0.6) if g.active else (0.8, 0.8, 0.83)
-        overtime = get_last_period(g, g.active)[1]
-        text_color = (0.5, 0, 0) if overtime else (0, 0, 0.5)
-    else:
-        color = (0.7, 0.7, 0.7)
-        text_color = (0, 0, 0)
+        if g.start:
+            color = (0.6, 0.9, 0.6) if g.active else (0.8, 0.8, 0.83)
+            overtime = get_last_period(g, g.active)[1]
+            text_color = (0.5, 0, 0) if overtime else (0, 0, 0.5)
+        else:
+            color = (0.7, 0.7, 0.7)
+            text_color = (0, 0, 0)
 
-    src = cairo.ImageSurface(cairo.FORMAT_ARGB32, max_w, max_h)
-    ctx = cairo.Context(src)
+        src = cairo.ImageSurface(cairo.FORMAT_ARGB32, max_w, max_h)
+        ctx = cairo.Context(src)
 
-    ctx.set_source_rgb(1, 1, 1)
-    ctx.rectangle(0, 0, max_w, max_h)
-    ctx.fill()
+        ctx.set_source_rgb(1, 1, 1)
+        ctx.rectangle(0, 0, max_w, max_h)
+        ctx.fill()
 
-    ctx.set_line_width(1)
-    ctx.set_source_rgb(*color)
-    ctx.rectangle(0, 0, max_w, max_h)
-    ctx.stroke()
-    ctx.rectangle(0, 0, timer_w + padding / 2, max_h)
-    ctx.fill()
+        ctx.set_line_width(1)
+        ctx.set_source_rgb(*color)
+        ctx.rectangle(0, 0, max_w, max_h)
+        ctx.stroke()
+        ctx.rectangle(0, 0, timer_w + padding / 2, max_h)
+        ctx.fill()
 
-    ctx.set_source_rgb(*text_color)
-    ctx.set_font_size(font_h)
+        ctx.set_source_rgb(*text_color)
+        ctx.set_font_size(font_h)
 
-    text_w, text_h = ctx.text_extents(duration_text)[2:4]
-    ctx.move_to(timer_w - text_w - padding, font_h + padding)
-    ctx.show_text(duration_text)
+        text_w, text_h = ctx.text_extents(duration_text)[2:4]
+        ctx.move_to(timer_w - text_w - padding, font_h + padding)
+        ctx.show_text(duration_text)
 
-    ctx.move_to(timer_w + padding, font_h + padding)
-    ctx.show_text(target_text)
+        ctx.move_to(timer_w + padding, font_h + padding)
+        ctx.show_text(target_text)
 
-    line_h = padding * 0.7
-    step_sec = 2
-    step_w = timer_w * step_sec / 60
-    duration_w = int(duration.s / step_sec) * step_w
-    ctx.set_line_width(line_h)
-    ctx.set_source_rgb(*text_color)
-    ctx.move_to(timer_w, max_h - line_h / 2)
-    ctx.line_to(timer_w - duration_w, max_h - line_h / 2)
-    ctx.stroke()
+        line_h = padding * 0.7
+        step_sec = 2
+        step_w = timer_w * step_sec / 60
+        duration_w = int(duration.s / step_sec) * step_w
+        ctx.set_line_width(line_h)
+        ctx.set_source_rgb(*text_color)
+        ctx.move_to(timer_w, max_h - line_h / 2)
+        ctx.line_to(timer_w - duration_w, max_h - line_h / 2)
+        ctx.stroke()
 
-    with tmp_file(g.path.img) as filename:
-        src.write_to_png(filename)
+        with tmp_file(g.path.img) as filename:
+            src.write_to_png(filename)
 
     with open(g.path.last, 'wb') as f:
         f.write(pickle.dumps({
@@ -522,6 +526,17 @@ def update_img(g):
 
     if g.conf.xfce_enable:
         prepare_xfce(g)
+
+    if g.conf.i3bar_enable:
+        target = target_text if g.active else target_text + '*'
+        result = '[{} {}]'.format(duration_text, target)
+        if g.active:
+            color = '\#9933cc'
+        else:
+            color = '\#66cc99'
+        result = {'full_text': result, 'color': color}
+        with tmp_file(g.path.i3bar, mode='w') as f:
+            f.write(json.dumps(result))
 
     if g.conf.overwork_period and g.active:
         last_working, need_break = get_last_period(g, True)
@@ -554,7 +569,7 @@ def set_last_state(g):
         with open(g.path.stats, 'r') as f:
             g.stats = f.read()
 
-    update_img(g)
+    update_ui(g)
 
 
 def connect_db(db_path):
