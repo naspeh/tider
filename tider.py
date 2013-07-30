@@ -529,6 +529,7 @@ def update_ui(g):
 
     if g.conf.i3bar_enable:
         target = target_text if g.active else target_text + '*'
+        duration_text = duration_text if g.start else 'Tider'
         result = '[{} {}]'.format(duration_text, target)
         if g.active:
             color = '\#9933cc'
