@@ -416,8 +416,8 @@ def get_stats(g, detailed=True):
         result = (
             '<b><big>Currently {state}</big></b>\n'
             '  target: <b>{target}</b>\n'
-            '  started at: <b>{started}</b>\n'
-            '  duration: <b>{duration}</b>'
+            '  duration: <b>{duration}</b>\n'
+            '  started at: <b>{started}</b>'
             .format(
                 state='working' if g.active else 'break',
                 target=g.target,
