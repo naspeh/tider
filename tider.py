@@ -877,14 +877,20 @@ def main(args=None):
         func=lambda: shell_call('sqlite3 {}'.format(g.path.db))
     )
 
+    # config example
+    sub('conf', help='print config example', func=print_conf)
+
     # xfce4 integration
     sub(
         'xfce', help='print command for xfce4-genmon-plugin',
         func=lambda: print('cat {}'.format(g.path.xfce))
     )
 
-    # config example
-    sub('conf', help='print config example', func=print_conf)
+    # i3bar integration
+    sub(
+        'i3bar', help='print command for i3bar',
+        func=lambda: print('cat {}'.format(g.path.i3bar))
+    )
 
     args = parser.parse_args(args)
     try:
