@@ -515,7 +515,7 @@ def update_ui(g):
         with tmp_file(g.path.img) as filename:
             src.write_to_png(filename)
 
-    with open(g.path.last, 'wb') as f:
+    with tmp_file(g.path.last, mode='wb') as f:
         f.write(pickle.dumps({
             'target': g.target,
             'active': g.active,
@@ -524,7 +524,7 @@ def update_ui(g):
             'last_overwork': g.last_overwork
         }))
 
-    with open(g.path.stats, 'w') as f:
+    with tmp_file(g.path.stats, mode='w') as f:
         f.write(g.stats)
 
     if g.conf.xfce_enable:
