@@ -812,7 +812,7 @@ def print_report(g, args):
         begin = time.mktime(interval_[0])
         end = time.mktime(interval_[1])
         day = 60 * 60 * 24
-        for i in range(int((end - begin) / day)):
+        for i in range(int((end - begin) / day) + 1):
             current = time.strftime(SQL_DATE, time.localtime(begin + i * day))
             result += [get_report(g, [current])]
 
