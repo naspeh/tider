@@ -543,16 +543,16 @@ def update_ui(g):
             g.last_overwork = None
         else:
             overtime = int(last_working - g.conf.work_period)
-            last = g.last_overwork
-            timeout = time.time() - last if last else overtime
-            if timeout >= g.conf.overwork_period:
+            timeout = time.time() - g.last_overwork if g.last_overwork else 0
+            if not timeout or timeout >= g.conf.overwork_period:
                 g.last_overwork = time.time()
+                f_seconds = lambda v: '<b>{}</b>'.format(str_seconds(v))
+                message = 'Working: ' + f_seconds(last_working)
+                if overtime:
+                    message += '\nOverworking: ' + f_seconds(overtime)
                 shell_call(
-                    'notify-send -i {} -t {} "Take a break!" '
-                    '"Working: <b>{}</b>\nOverworking: <b>{}</b>"'
-                    .format(
-                        g.path.img, int(g.conf.overwork_period * 500),
-                        str_seconds(last_working), str_seconds(overtime)
+                    'notify-send -i {} -t {} "Take a break!" "{}"'.format(
+                        g.path.img, int(g.conf.overwork_period * 500), message
                     )
                 )
     return True
