@@ -591,6 +591,16 @@ def connect_db(db_path):
             )
             '''
         )
+        cur.execute(
+            '''
+            CREATE VIEW `log_pretty` AS
+            SELECT
+                id, target, work / 60 AS work_m, break / 60 AS break_m,
+                start, datetime(start, 'unixepoch', 'localtime'),
+                end, datetime(end, 'unixepoch', 'localtime')
+            FROM `log` WHERE work_m > 0 OR break_m > 0
+            '''
+        )
         db.commit()
     return db
 
