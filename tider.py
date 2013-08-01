@@ -42,9 +42,9 @@ DEFAULTS = (
     ('xfce_tooltip', ('yes', 'boolean', '')),
     ('xfce_click', ('no', 'boolean', '')),
     ('i3bar_enable', ('no', 'boolean', '')),
-    ('i3bar_tmpl', ('[☯ {duration} {target}]', '', '')),
-    ('i3bar_working', ('#007700', '', 'color: #ff0000 - red, etc')),
-    ('i3bar_break', ('#777777', '', 'color: #ff0000 - red, etc'))
+    ('i3bar_tmpl', ('[{symbol} {duration} {target}]', '', '')),
+    ('i3bar_work_rgb', ('#007700', '', 'color: #ff0000 - red, etc')),
+    ('i3bar_break_rgb', ('#777777', '', 'color: #ff0000 - red, etc'))
 )
 
 strip_tags = lambda r: re.sub(r'<[^>]+>', '', r)
@@ -531,9 +531,12 @@ def update_ui(g):
         prepare_xfce(g)
 
     if g.conf.i3bar_enable:
-        dur = duration_text if g.start else 'Tider'
-        full_text = g.conf.i3bar_tmpl.format(duration=dur, target=target)
-        color = g.conf.i3bar_working if g.active else g.conf.i3bar_break
+        full_text = g.conf.i3bar_tmpl.format(
+            symbol='☭' if g.active else '☯',
+            duration=duration_text if g.start else 'Tider',
+            target=target
+        )
+        color = g.conf.i3bar_work_rgb if g.active else g.conf.i3bar_break_rgb
         with tmp_file(g.path.i3bar, mode='w') as f:
             f.write(json.dumps({'full_text': full_text, 'color': color}))
 
