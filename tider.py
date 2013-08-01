@@ -554,9 +554,8 @@ def update_ui(g):
                 if overtime:
                     message += '\nOverworking: ' + f_seconds(overtime)
                 shell_call(
-                    'notify-send -i {} -t {} "Take a break!" "{}"'.format(
-                        g.path.img, int(g.conf.overwork_period * 500), message
-                    )
+                    'notify-send -t {} "Take a break!" "{}"'
+                    .format(int(g.conf.overwork_period * 500), message)
                 )
     return True
 
