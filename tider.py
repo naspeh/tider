@@ -799,9 +799,6 @@ def prepare_xfce(g):
 
 
 def parse_interval(interval):
-    if len(interval) == 2 and interval[0] > interval[1]:
-        raise SystemExit('Wrong interval: second date less than first')
-
     result = None
     for prefix in ['', '%Y%m', '%Y']:
         try:
@@ -810,6 +807,9 @@ def parse_interval(interval):
             break
         except ValueError:
             pass
+
+    if len(result) == 2 and result[0] > result[1]:
+        raise SystemExit('Wrong interval: second date less than first')
 
     if not result:
         raise SystemExit('Wrong interval format')
