@@ -171,7 +171,7 @@ def disable(g):
     if g.ui:
         g.ui.update()
     else:
-        update_ui(g)
+        update_all(g)
 
 
 def set_activity(g, active, target=None, new=True):
@@ -188,7 +188,7 @@ def set_activity(g, active, target=None, new=True):
 
     g.target = target
     g.active = active
-    update_ui(g)
+    update_all(g)
 
 
 def get_completion(g):
@@ -289,7 +289,7 @@ def create_ui(g):
     tray = create_tray(g, menu) if not g.conf.hide_tray else None
 
     def update():
-        update_ui(g)
+        update_all(g)
         menu.update()
         if win:
             win.update()
@@ -443,7 +443,7 @@ def get_stats(g, detailed=True):
     return result
 
 
-def update_ui(g):
+def update_all(g):
     if g.last and time.time() - g.last > g.conf.offline_timeout:
         return disable(g)
     else:
@@ -570,7 +570,7 @@ def set_last_state(g):
         with open(g.path.stats, 'r') as f:
             g.stats = f.read()
 
-    update_ui(g)
+    update_all(g)
 
 
 def connect_db(db_path):
