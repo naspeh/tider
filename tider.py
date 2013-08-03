@@ -240,9 +240,16 @@ def change_target(g):
     start.set_label('start new')
     fix = Gtk.RadioButton.new_from_widget(start)
     fix.set_label('edit current')
+    rm = Gtk.RadioButton.new_from_widget(start)
+    rm.set_label('remove current')
+    off = Gtk.RadioButton.new_from_widget(start)
+    off.set_label('turn OFF')
     if g.start:
         box.add(start)
         box.add(fix)
+        box.add(Gtk.Separator())
+        box.add(rm)
+        box.add(off)
 
     dialog.add_buttons(
         Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL,
@@ -260,6 +267,11 @@ def change_target(g):
             set_activity(g, active, target=target)
         elif fix.get_active():
             set_activity(g, active, target=target, new=False)
+        elif rm.get_active():
+            g.start = None
+            disable(g)
+        elif off.get_active():
+            disable(g)
         else:
             raise ValueError('wrong state')
 
