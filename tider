@@ -1,5 +1,5 @@
 #!/bin/sh
-DIR=$(cd "$( dirname "$0" )" && pwd)
+DIR=$(dirname `realpath $0`)
 
 python $DIR'/tider.py' $@
 

@@ -55,11 +55,11 @@ shell_call = lambda cmd: subprocess.call(cmd, shell=True)
 def tider():
     g = get_context()
     if os.path.exists(g.path.sock):
-        print(
-            'Another `tider` instance already run. '
-            'Try "$ rm {}" if not.'.format(g.path.sock)
-        )
-        raise SystemExit(1)
+        if send_action(g, 'ping') == 'pong':
+            print('Another `tider` instance already run.')
+            raise SystemExit(1)
+        else:
+            os.remove(g.path.sock)
 
     g.ui = create_ui(g)
 
@@ -67,12 +67,16 @@ def tider():
     server.daemon = True
     server.start()
 
-    signal.signal(signal.SIGINT, lambda s, f: Gtk.main_quit())
+    signal.signal(signal.SIGINT, lambda s, f: main_quit(g))
     try:
         Gtk.main()
     finally:
-        disable(g)
-        teardown(g)
+        if g.reload:
+            print('Tider reloading...')
+            raise SystemExit(RELOAD)
+        else:
+            disable(g)
+            print('Tider closed.')
 
 
 def get_config(file):
@@ -135,6 +139,7 @@ def get_context():
         target=None,
         stats=None,
         ui=None,
+        reload=False,
         last_overwork=None,
     )
     set_last_state(g)
@@ -171,12 +176,6 @@ def fix_slots(name, **fields):
     return cls(**fields)
 
 
-def teardown(g, code=0, msg='Tider closed.'):
-    os.remove(g.path.sock)
-    print(msg)
-    raise SystemExit(code)
-
-
 def disable(g):
     save_log(g)
     g.start = None
@@ -186,6 +185,12 @@ def disable(g):
         g.ui.update()
     else:
         update_all(g)
+
+
+def main_quit(g, reload=False):
+    g.reload = reload
+    os.remove(g.path.sock)
+    Gtk.main_quit()
 
 
 def set_activity(g, active, target=None, new=True):
@@ -369,8 +374,8 @@ def create_win(g):
         win.move(g.conf.win_move_x or 0, g.conf.win_move_y or 0)
     win.show_all()
 
-    win.connect('destroy', lambda w: Gtk.main_quit())
-    win.connect('delete_event', lambda w, e: Gtk.main_quit())
+    win.connect('destroy', lambda w: main_quit(g))
+    win.connect('delete_event', lambda w, e: main_quit(g))
     box.connect('button-press-event', lambda w, e: g.ui.popup_menu(e))
 
     def update():
@@ -408,7 +413,7 @@ def create_menu(g):
     separator.show()
 
     quit = Gtk.ImageMenuItem.new_from_stock(Gtk.STOCK_QUIT, None)
-    quit.connect('activate', lambda w: Gtk.main_quit())
+    quit.connect('activate', lambda w: main_quit(g))
     quit.show()
 
     menu = Gtk.Menu()
@@ -675,8 +680,13 @@ def run_server(g):
             data = conn.recv(1024)
             if not data:
                 break
-            action = run_server.actions.get(data.decode())
-            GObject.idle_add(action, g)
+            action = data.decode()
+            if action == 'ping':
+                conn.send('pong'.encode())
+            else:
+                action = run_server.actions.get(data.decode())
+                GObject.idle_add(action, g)
+                conn.send('ok'.encode())
     conn.close()
 
 run_server.actions = {
@@ -684,17 +694,25 @@ run_server.actions = {
     'toggle-active': lambda g: g.start and set_activity(g, not g.active),
     'menu': lambda g: g.ui.popup_menu(None),
     'disable': lambda g: disable(g),
-    'reload': lambda g: teardown(g, RELOAD, msg='Tider reloaded.'),
-    'quit': lambda g: Gtk.main_quit(),
+    'reload': lambda g: main_quit(g, reload=True),
+    'quit': lambda g: main_quit(g),
+    'ping': None
 }
 
 
 def send_action(g, action):
     sockfile = g.path.sock
     s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
-    s.connect(sockfile)
+    try:
+        s.connect(sockfile)
+    except socket.error:
+        return None
     s.send(action.encode())
+    data = s.recv(1024)
     s.close()
+    if data:
+        return data.decode()
+    return True
 
 
 @contextmanager
@@ -881,8 +899,7 @@ def main(args=None):
         args = sys.argv[1:]
 
     if not args:
-        tider()
-        return
+        return tider()
 
     g = get_context()
     parser = argparse.ArgumentParser()
@@ -896,7 +913,7 @@ def main(args=None):
     # call action
     sub_do = sub(
         'call', help='call a specific action',
-        func=lambda: send_action(g, args.action)
+        func=lambda: print(send_action(g, args.action))
     )
     sub_do.add_argument(
         'action', help='choice action', choices=run_server.actions.keys()
