@@ -231,7 +231,8 @@ def change_target(g):
     name.connect('key-press-event', press_enter)
     note = Gtk.Label(halign=Gtk.Align.END)
     note.set_markup(
-        '<small>Use symbol <b>* in the end</b> for a break</small>'
+        '<small>Use symbol <b>{} in the end</b> for a break</small>'
+        .format(g.conf.break_symbol)
     )
     box.add(name)
     box.pack_start(note, True, True, 3)
@@ -240,15 +241,15 @@ def change_target(g):
     start.set_label('start new')
     fix = Gtk.RadioButton.new_from_widget(start)
     fix.set_label('edit current')
-    rm = Gtk.RadioButton.new_from_widget(start)
-    rm.set_label('remove current')
+    reject = Gtk.RadioButton.new_from_widget(start)
+    reject.set_label('reject current')
     off = Gtk.RadioButton.new_from_widget(start)
     off.set_label('turn OFF')
     if g.start:
         box.add(start)
         box.add(fix)
+        box.add(reject)
         box.add(Gtk.Separator())
-        box.add(rm)
         box.add(off)
 
     dialog.add_buttons(
@@ -262,12 +263,14 @@ def change_target(g):
         target = name.get_text().strip()
         active = not target.endswith(g.conf.break_symbol)
         if not active:
-            target = target.rstrip(' *')
-        if start.get_active():
+            target = target.rstrip(' ' + g.conf.break_symbol)
+        if not target:
+            pass
+        elif start.get_active():
             set_activity(g, active, target=target)
         elif fix.get_active():
             set_activity(g, active, target=target, new=False)
-        elif rm.get_active():
+        elif reject.get_active():
             g.start = None
             disable(g)
         elif off.get_active():
