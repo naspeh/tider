@@ -18,6 +18,7 @@ from gi.repository import Gdk, Gtk, GObject
 
 GObject.threads_init()
 
+RELOAD = 100
 SQL_DATE = '%Y-%m-%d'
 APP_DIRS = [
     os.path.join(os.path.dirname(__file__), 'var'),
@@ -71,8 +72,7 @@ def tider():
         Gtk.main()
     finally:
         disable(g)
-        os.remove(g.path.sock)
-        print('Tider closed.')
+        teardown(g)
 
 
 def get_config(file):
@@ -169,6 +169,12 @@ def fix_slots(name, **fields):
     cls = type(name, (_FixedSlots, ), {})
     cls.__slots__ = fields.keys()
     return cls(**fields)
+
+
+def teardown(g, code=0, msg='Tider closed.'):
+    os.remove(g.path.sock)
+    print(msg)
+    raise SystemExit(code)
 
 
 def disable(g):
@@ -676,9 +682,10 @@ def run_server(g):
 run_server.actions = {
     'target': lambda g: change_target(g),
     'toggle-active': lambda g: g.start and set_activity(g, not g.active),
-    'disable': lambda g: disable(g),
-    'quit': lambda g: Gtk.main_quit(),
     'menu': lambda g: g.ui.popup_menu(None),
+    'disable': lambda g: disable(g),
+    'reload': lambda g: teardown(g, RELOAD, msg='Tider reloaded.'),
+    'quit': lambda g: Gtk.main_quit(),
 }
 
 

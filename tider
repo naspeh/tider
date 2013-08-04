@@ -1,4 +1,10 @@
-#!/usr/bin/env python
-import tider
+#!/bin/sh
+DIR=$(cd "$( dirname "$0" )" && pwd)
 
-tider.main()
+python $DIR'/tider.py' $@
+
+# reload if 100
+code=$?
+if [ $code == 100 ]; then
+    $0 $@
+fi
