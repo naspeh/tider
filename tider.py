@@ -53,6 +53,13 @@ shell_call = lambda cmd: subprocess.call(cmd, shell=True)
 
 def tider():
     g = get_context()
+    if os.path.exists(g.path.sock):
+        print(
+            'Another `tider` instance already run. '
+            'Try "$ rm {}" if not.'.format(g.path.sock)
+        )
+        raise SystemExit(1)
+
     g.ui = create_ui(g)
 
     server = Thread(target=run_server, args=(g,))
@@ -64,6 +71,7 @@ def tider():
         Gtk.main()
     finally:
         disable(g)
+        os.remove(g.path.sock)
         print('Tider closed.')
 
 
@@ -651,8 +659,6 @@ def save_log(g):
 
 def run_server(g):
     sockfile = g.path.sock
-    if os.path.exists(sockfile):
-        os.remove(sockfile)
     s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
     s.bind(sockfile)
     s.listen(1)
