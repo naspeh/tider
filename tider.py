@@ -837,14 +837,25 @@ def print_report(g, args):
     print(result)
 
 
-def print_conf():
-    result = []
-    for k, v in DEFAULTS:
-        line = '{}={}'.format(k, v[0] if v[0] else '')
-        if v[2]:
-            line = '# {}\n{}'.format(v[2], line)
-        result.append(line)
-    print('[default]\n' + '\n\n'.join(result))
+def print_examples(g, args):
+    if args.name == 'xfce':
+        print(
+            'Add "xfce_enable=yes" to config.\n'
+            'Command for xfce4-genmon-plugin:\n$ cat {}'.format(g.path.xfce)
+        )
+    elif args.name == 'i3bar':
+        print(
+            'Add "i3bar_enable=yes" to config.\n'
+            'Command for i3bar:\n$ cat {}'.format(g.path.i3bar)
+        )
+    elif args.name == 'conf':
+        result = []
+        for k, v in DEFAULTS:
+            line = '{}={}'.format(k, v[0] if v[0] else '')
+            if v[2]:
+                line = '# {}\n{}'.format(v[2], line)
+            result.append(line)
+        print('[default]\n' + '\n\n'.join(result))
 
 
 def main(args=None):
@@ -892,19 +903,12 @@ def main(args=None):
         func=lambda: shell_call('sqlite3 {}'.format(g.path.db))
     )
 
-    # config example
-    sub('conf', help='print config example', func=print_conf)
-
-    # xfce4 integration
-    sub(
-        'xfce', help='print command for xfce4-genmon-plugin',
-        func=lambda: print('cat {}'.format(g.path.xfce))
+    # examples
+    sub_examples = sub(
+        'print', help='print examples', func=lambda: print_examples(g, args)
     )
-
-    # i3bar integration
-    sub(
-        'i3bar', help='print command for i3bar',
-        func=lambda: print('cat {}'.format(g.path.i3bar))
+    sub_examples.add_argument(
+        'name', help='choice type', choices=['conf', 'xfce', 'i3bar']
     )
 
     args = parser.parse_args(args)
