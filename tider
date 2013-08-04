@@ -3,8 +3,8 @@ DIR=$(cd "$( dirname "$0" )" && pwd)
 
 python $DIR'/tider.py' $@
 
-# reload if 100
 code=$?
 if [ $code == 100 ]; then
+    # reload
     $0 $@
 fi
