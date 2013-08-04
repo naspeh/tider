@@ -908,7 +908,7 @@ def main(args=None):
         'print', help='print examples', func=lambda: print_examples(g, args)
     )
     sub_examples.add_argument(
-        'name', help='choice type', choices=['conf', 'xfce', 'i3bar']
+        'name', help='choice name', choices=['conf', 'xfce', 'i3bar']
     )
 
     args = parser.parse_args(args)
