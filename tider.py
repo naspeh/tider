@@ -416,11 +416,16 @@ def create_menu(g):
             stop.hide()
             start.show()
 
+    def popup_default(e):
+        if e:
+            menu.popup(None, None, None, None, e.button, e.time)
+        else:
+            screen = menu.get_screen()
+            x, y = int(screen.get_width() / 2), int(screen.get_height() / 2)
+            menu.popup(None, None, lambda *a: (x, y, True), None, 0, 0)
+
     menu.update = update
-    menu.popup_default = lambda e: (
-        menu.popup(None, None, None, None, e.button, e.time)
-        if e else menu.popup(None, None, None, None, 0, 0)
-    )
+    menu.popup_default = popup_default
     return menu
 
 
