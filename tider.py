@@ -853,45 +853,55 @@ def parse_interval(interval):
     return result
 
 
-def print_report(g, args):
-    interval = result = []
-    if args.interval:
-        interval_ = parse_interval(args.interval)
-        interval = [time.strftime(SQL_DATE, i) for i in interval_]
-    if args.daily and len(interval) == 2:
-        result = []
-        begin = time.mktime(interval_[0])
-        end = time.mktime(interval_[1])
-        day = 60 * 60 * 24
-        for i in range(int((end - begin) / day) + 1):
-            current = time.strftime(SQL_DATE, time.localtime(begin + i * day))
-            result += [get_report(g, [current])]
+def process_args(g, args):
+    if args.sub == 'call':
+        print(send_action(g, args.action))
 
-    result += [get_report(g, interval)]
-    result = '\n\n'.join(result)
-    result = re.sub(r'<[^>]+>', '', result)
-    print(result)
+    elif args.sub == 'report':
+        interval = result = []
+        if args.interval:
+            interval_ = parse_interval(args.interval)
+            interval = [time.strftime(SQL_DATE, i) for i in interval_]
+        if args.daily and len(interval) == 2:
+            result = []
+            begin = time.mktime(interval_[0])
+            end = time.mktime(interval_[1])
+            day = 60 * 60 * 24
+            for i in range(int((end - begin) / day) + 1):
+                current = time.localtime(begin + i * day)
+                result += [get_report(g, [time.strftime(SQL_DATE, current)])]
 
+        result += [get_report(g, interval)]
+        result = '\n\n'.join(result)
+        result = re.sub(r'<[^>]+>', '', result)
+        print(result)
 
-def print_examples(g, args):
-    if args.name == 'xfce':
-        print(
-            'Add "xfce_enable=yes" to config.\n'
-            'Command for xfce4-genmon-plugin:\n$ cat {}'.format(g.path.xfce)
-        )
-    elif args.name == 'i3bar':
-        print(
-            'Add "i3bar_enable=yes" to config.\n'
-            'Command for i3bar:\n$ cat {}'.format(g.path.i3bar)
-        )
-    elif args.name == 'conf':
-        result = []
-        for k, v in DEFAULTS:
-            line = '{}={}'.format(k, v[0] if v[0] else '')
-            if v[2]:
-                line = '# {}\n{}'.format(v[2], line)
-            result.append(line)
-        print('[default]\n' + '\n\n'.join(result))
+    elif args.sub == 'db':
+        shell_call('sqlite3 {}'.format(g.path.db))
+
+    elif args.sub == 'print':
+        if args.name == 'xfce':
+            print(
+                'Add "xfce_enable=yes" to config.\n'
+                'Command for xfce4-genmon-plugin:\n'
+                '$ cat {}'.format(g.path.xfce)
+            )
+        elif args.name == 'i3bar':
+            print(
+                'Add "i3bar_enable=yes" to config.\n'
+                'Command for i3bar:\n'
+                '$ cat {}'.format(g.path.i3bar)
+            )
+        elif args.name == 'conf':
+            result = []
+            for k, v in DEFAULTS:
+                line = '{}={}'.format(k, v[0] if v[0] else '')
+                if v[2]:
+                    line = '# {}\n{}'.format(v[2], line)
+                result.append(line)
+            print('[default]\n' + '\n\n'.join(result))
+    else:
+        raise ValueError('Wrong subcommand')
 
 
 def main(args=None):
@@ -903,52 +913,30 @@ def main(args=None):
 
     g = get_context()
     parser = argparse.ArgumentParser()
-    subs = parser.add_subparsers()
-
-    def sub(name, func, **kw):
-        cmd = subs.add_parser(name, **kw)
-        cmd.set_defaults(func=func)
-        return cmd
+    subs = parser.add_subparsers(dest='sub')
 
     # call action
-    sub_do = sub(
-        'call', help='call a specific action',
-        func=lambda: print(send_action(g, args.action))
-    )
-    sub_do.add_argument(
-        'action', help='choice action', choices=run_server.actions.keys()
-    )
+    sub = subs.add_parser('call', help='call a specific action')
+    sub.add_argument('action', choices=run_server.actions.keys())
 
     # statistics
-    sub_report = sub(
-        'report', aliases=['re'], help='print report',
-        func=lambda: print_report(g, args)
-    )
-    sub_report.add_argument(
+    sub = subs.add_parser('report', aliases=['re'], help='print report')
+    sub.add_argument('-d', '--daily', action='store_true', help='daily report')
+    sub.add_argument(
         '-i', '--interval',
         help='date interval: "YYYYMMDD", "MMDD", "DD" and pair via "-"',
     )
-    sub_report.add_argument(
-        '-d', '--daily', action='store_true', help='daily report'
-    )
 
     # sqlite session
-    sub(
-        'db', help='enter to sqlite session',
-        func=lambda: shell_call('sqlite3 {}'.format(g.path.db))
-    )
+    subs.add_parser('db', help='enter to sqlite session')
 
     # examples
-    sub_examples = sub(
-        'print', help='print examples', func=lambda: print_examples(g, args)
-    )
-    sub_examples.add_argument(
-        'name', help='choice name', choices=['conf', 'xfce', 'i3bar']
-    )
+    sub = subs.add_parser('print', help='print examples')
+    sub.add_argument('name', choices=['conf', 'xfce', 'i3bar'])
 
     args = parser.parse_args(args)
     try:
-        args.func()
+        process_args(g, args)
     except KeyboardInterrupt:
         raise SystemExit()
 
