@@ -25,13 +25,13 @@ APP_DIRS = [
     os.path.join(os.path.expanduser('~'), '.config', 'tider')
 ]
 DEFAULTS = (
-    ('update_period', ('500', 'int')), # in microseconds
-    ('offline_timeout', ('60', 'int')), # in seconds
-    ('min_duration', ('20',  'int')), # in seconds
+    ('update_period', ('500', 'int')),  # in microseconds
+    ('offline_timeout', ('60', 'int')),  # in seconds
+    ('min_duration', ('20',  'int')),  # in seconds
     ('break_symbol', ('*', '')),
     ('break_period', ('600', 'int')),  # in seconds
-    ('work_period', ('3000', 'int')), # in seconds
-    ('overwork_period', ('300', 'int')), # in seconds
+    ('work_period', ('3000', 'int')),  # in seconds
+    ('overwork_period', ('300', 'int')),  # in seconds
     ('height', ('20', 'int')),
     ('width', (None, 'int')),
     ('font_size', (None, 'int')),
@@ -454,7 +454,7 @@ def get_stats(g, detailed=True):
     else:
         result = (
             '<b><big>Currently {state}</big></b>\n'
-            '  <b>{target}: {duration}</b> (started at: {started})'
+            '  <b>{target}: {duration}</b> (from {started})'
             .format(
                 state='working' if g.active else 'break',
                 target=g.target,
@@ -911,26 +911,25 @@ def main(args=None):
 
     g = get_context()
     parser = argparse.ArgumentParser()
-    subs = parser.add_subparsers(dest='sub')
+    subs = parser.add_subparsers()
 
-    # call action
-    sub = subs.add_parser('call', help='call a specific action')
-    sub.add_argument('action', choices=run_server.actions.keys())
+    def sub(name, **kw):
+        sub = subs.add_parser(name, **kw)
+        sub.set_defaults(sub=name)
+        sub.arg = sub.add_argument
+        return sub
 
-    # statistics
-    sub = subs.add_parser('report', aliases=['re'], help='print report')
-    sub.add_argument('-d', '--daily', action='store_true', help='daily report')
-    sub.add_argument(
-        '-i', '--interval',
-        help='date interval: "YYYYMMDD", "MMDD", "DD" and pair via "-"',
-    )
+    s = sub('call', help='call a specific action')
+    s.arg('action', help='choice action', choices=run_server.actions.keys())
 
-    # sqlite session
-    subs.add_parser('db', help='enter to sqlite session')
+    s = sub('report', aliases=['re'], help='print report')
+    s.arg('-d', '--daily', action='store_true', help='daily report')
+    s.arg('-i', '--interval', help='YYYYMMDD, MMDD, DD or pair via "-"')
 
-    # examples
-    sub = subs.add_parser('print', help='print examples')
-    sub.add_argument('name', choices=['conf', 'xfce', 'i3bar'])
+    sub('db', help='enter to sqlite session')
+
+    s = sub('print', help='print examples')
+    s.arg('name', help='choice name', choices=['conf', 'xfce', 'i3bar'])
 
     args = parser.parse_args(args)
     try:
