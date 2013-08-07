@@ -25,27 +25,27 @@ APP_DIRS = [
     os.path.join(os.path.expanduser('~'), '.config', 'tider')
 ]
 DEFAULTS = (
-    ('update_period', ('500', 'int', 'in microseconds')),
-    ('offline_timeout', ('60', 'int', 'in seconds')),
-    ('min_duration', ('20',  'int', 'in seconds')),
-    ('break_symbol', ('*', '', '')),
-    ('break_period', ('600', 'int', 'in seconds')),
-    ('work_period', ('3000', 'int', 'in seconds')),
-    ('overwork_period', ('300', 'int', 'in seconds')),
-    ('height', ('20', 'int', '')),
-    ('width', (None, 'int', '')),
-    ('font_size', (None, 'int', '')),
-    ('hide_tray', ('yes', 'boolean', '')),
-    ('hide_win', ('no', 'boolean', '')),
-    ('win_move_x', (None, 'int', '')),
-    ('win_move_y', (None, 'int', '')),
-    ('xfce_enable', ('no', 'boolean', '')),
-    ('xfce_tooltip', ('yes', 'boolean', '')),
-    ('xfce_click', ('no', 'boolean', '')),
-    ('i3bar_enable', ('no', 'boolean', '')),
-    ('i3bar_tmpl', ('[{symbol} {duration} {target}]', '', '')),
-    ('i3bar_work_rgb', ('#007700', '', 'color: #ff0000 - red, etc')),
-    ('i3bar_break_rgb', ('#777777', '', 'color: #ff0000 - red, etc'))
+    ('update_period', ('500', 'int')), # in microseconds
+    ('offline_timeout', ('60', 'int')), # in seconds
+    ('min_duration', ('20',  'int')), # in seconds
+    ('break_symbol', ('*', '')),
+    ('break_period', ('600', 'int')),  # in seconds
+    ('work_period', ('3000', 'int')), # in seconds
+    ('overwork_period', ('300', 'int')), # in seconds
+    ('height', ('20', 'int')),
+    ('width', (None, 'int')),
+    ('font_size', (None, 'int')),
+    ('hide_tray', ('yes', 'boolean')),
+    ('hide_win', ('no', 'boolean')),
+    ('win_move_x', (None, 'int')),
+    ('win_move_y', (None, 'int')),
+    ('xfce_enable', ('no', 'boolean')),
+    ('xfce_tooltip', ('yes', 'boolean')),
+    ('xfce_click', ('no', 'boolean')),
+    ('i3bar_enable', ('no', 'boolean')),
+    ('i3bar_tmpl', ('[{symbol} {duration} {target}]', '')),
+    ('i3bar_work_rgb', ('#007700', '')),
+    ('i3bar_break_rgb', ('#777777', ''))
 )
 
 strip_tags = lambda r: re.sub(r'<[^>]+>', '', r)
@@ -896,10 +896,8 @@ def process_args(g, args):
             result = []
             for k, v in DEFAULTS:
                 line = '{}={}'.format(k, v[0] if v[0] else '')
-                if v[2]:
-                    line = '# {}\n{}'.format(v[2], line)
                 result.append(line)
-            print('[default]\n' + '\n\n'.join(result))
+            print('[default]\n' + '\n'.join(result))
     else:
         raise ValueError('Wrong subcommand')
 
