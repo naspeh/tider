@@ -635,8 +635,8 @@ def connect_db(db_path):
             CREATE VIEW `log_pretty` AS
             SELECT
                 id, target, work / 60 AS work_m, break / 60 AS break_m,
-                start, datetime(start, 'unixepoch', 'localtime'),
-                end, datetime(end, 'unixepoch', 'localtime')
+                start, datetime(start, 'unixepoch', 'localtime') AS start_str,
+                end, datetime(end, 'unixepoch', 'localtime') AS end_str
             FROM `log` WHERE work_m > 0 OR break_m > 0
             '''
         )
