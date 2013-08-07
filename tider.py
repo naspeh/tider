@@ -853,7 +853,30 @@ def parse_interval(interval):
     return result
 
 
-def process_args(g, args):
+def process_args(args):
+    g = get_context()
+    parser = argparse.ArgumentParser()
+    subs = parser.add_subparsers()
+
+    def sub(name, **kw):
+        sub = subs.add_parser(name, **kw)
+        sub.set_defaults(sub=name)
+        sub.arg = sub.add_argument
+        return sub
+
+    s = sub('call', help='call a specific action')
+    s.arg('action', help='choice action', choices=run_server.actions.keys())
+
+    s = sub('report', aliases=['re'], help='print report')
+    s.arg('-d', '--daily', action='store_true', help='daily report')
+    s.arg('-i', '--interval', help='YYYYMMDD, MMDD, DD or pair via "-"')
+
+    sub('db', help='enter to sqlite session')
+
+    s = sub('print', help='print examples')
+    s.arg('name', help='choice name', choices=['conf', 'xfce', 'i3bar'])
+
+    args = parser.parse_args(args)
     if args.sub == 'call':
         print(send_action(g, args.action))
 
@@ -909,31 +932,8 @@ def main(args=None):
     if not args:
         return tider()
 
-    g = get_context()
-    parser = argparse.ArgumentParser()
-    subs = parser.add_subparsers()
-
-    def sub(name, **kw):
-        sub = subs.add_parser(name, **kw)
-        sub.set_defaults(sub=name)
-        sub.arg = sub.add_argument
-        return sub
-
-    s = sub('call', help='call a specific action')
-    s.arg('action', help='choice action', choices=run_server.actions.keys())
-
-    s = sub('report', aliases=['re'], help='print report')
-    s.arg('-d', '--daily', action='store_true', help='daily report')
-    s.arg('-i', '--interval', help='YYYYMMDD, MMDD, DD or pair via "-"')
-
-    sub('db', help='enter to sqlite session')
-
-    s = sub('print', help='print examples')
-    s.arg('name', help='choice name', choices=['conf', 'xfce', 'i3bar'])
-
-    args = parser.parse_args(args)
     try:
-        process_args(g, args)
+        process_args(args)
     except KeyboardInterrupt:
         raise SystemExit()
 
