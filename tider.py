@@ -696,6 +696,7 @@ run_server.actions = {
     'disable': lambda g: disable(g),
     'reload': lambda g: main_quit(g, reload=True),
     'quit': lambda g: main_quit(g),
+    'report': lambda g: show_report(g),
     'ping': None
 }
 
