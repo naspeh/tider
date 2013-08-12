@@ -458,7 +458,7 @@ def get_stats(g, detailed=True):
             .format(
                 state='working' if g.active else 'break',
                 target=g.target,
-                started=time.strftime('%H:%M:%S', time.localtime(g.start)),
+                started=time.strftime('%H:%M', time.localtime(g.start)),
                 duration=str_seconds(time.time() - g.start)
             )
         )
