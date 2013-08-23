@@ -227,6 +227,8 @@ def get_completion(g):
     completion = Gtk.EntryCompletion(model=liststore)
     completion.set_text_column(0)
     completion.set_minimum_key_length(0)
+    completion.set_popup_completion(True)
+    completion.set_popup_single_match(False)
     completion.set_inline_completion(True)
     completion.set_inline_selection(True)
     return completion
