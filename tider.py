@@ -848,11 +848,10 @@ def parse_interval(interval):
         except ValueError:
             pass
 
-    if len(result) == 2 and result[0] > result[1]:
-        raise SystemExit('Wrong interval: second date less than first')
-
     if not result:
         raise SystemExit('Wrong interval format')
+    if len(result) == 2 and result[0] > result[1]:
+        raise SystemExit('Wrong interval: second date less than first')
     return result
 
 
