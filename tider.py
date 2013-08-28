@@ -736,8 +736,8 @@ def split_seconds(v):
 
 def str_seconds(duration):
     time = split_seconds(duration)
-    result = '{}h'.format(time.h) if time.h else ''
-    result += '{}m'.format(time.m) if time.h or time.m else ''
+    result = '{}h '.format(time.h) if time.h else ''
+    result += '{}m '.format(time.m) if time.h or time.m else ''
     result += '{}s'.format(time.s)
     return result
 
