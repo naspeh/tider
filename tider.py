@@ -467,16 +467,16 @@ def get_stats(g, detailed=True):
                 duration=str_seconds(time.time() - g.start)
             )
         )
-    last_working, need_break = get_last_working(g)
-    last_working = (
+    last_working = get_last_working(g)
+    last_working_str = (
         '<b>Last working period: {}</b>'
-        .format(str_seconds(last_working))
+        .format(str_seconds(last_working.period))
     )
-    if g.active and need_break:
-        last_working += '\n<b>Need a break!</b>'
-    elif not g.active and not need_break:
-        last_working += '\n<b>Can work again!</b>'
-    result = [result, last_working]
+    if g.active and last_working.need_break:
+        last_working_str += '\n<b>Need a break!</b>'
+    elif not g.active and not last_working.need_break:
+        last_working_str += '\n<b>Can work again!</b>'
+    result = [result, last_working_str]
     if detailed:
         result += [get_report(g)]
     result = '\n\n'.join(result)
@@ -512,7 +512,7 @@ def update_all(g):
 
         if g.start:
             color = (0.6, 0.9, 0.6) if g.active else (0.8, 0.8, 0.83)
-            need_break = get_last_working(g)[1]
+            need_break = get_last_working(g).need_break
             text_color = (0.5, 0, 0) if need_break else (0, 0, 0.5)
         else:
             color = (0.7, 0.7, 0.7)
@@ -581,16 +581,16 @@ def update_all(g):
             f.write(json.dumps({'full_text': full_text, 'color': color}))
 
     if g.conf.overwork_period and g.active:
-        last_working, need_break = get_last_working(g)
-        if not need_break:
+        last_working = get_last_working(g)
+        if not last_working.need_break:
             g.last_overwork = None
         else:
-            overtime = int(last_working - g.conf.work_period)
+            overtime = int(last_working.period - g.conf.work_period)
             timeout = time.time() - g.last_overwork if g.last_overwork else 0
             if not timeout or timeout >= g.conf.overwork_period:
                 g.last_overwork = time.time()
                 f_seconds = lambda v: '<b>{}</b>'.format(str_seconds(v))
-                message = 'Working: ' + f_seconds(last_working)
+                message = 'Working: ' + f_seconds(last_working.period)
                 if overtime:
                     message += '\nOverworking: ' + f_seconds(overtime)
                 shell_call(
@@ -759,19 +759,20 @@ def get_last_working(g):
         rows.insert(0, (g.start, now, now - g.start))
 
     if not rows:
-        return 0, False
-
-    period = rows[0][2]
-    for i in range(1, len(rows)):
-        if rows[i-1][0] - rows[i][1] > g.conf.break_period:
-            break
-        period += rows[i][2]
-
-    if not g.active and now - rows[0][1] > g.conf.break_period:
-        need_break = False
+        period, started, need_break = 0, None, False
     else:
-        need_break = period > g.conf.work_period
-    return period, need_break
+        period, started, need_break = rows[0][2], rows[0][0], False
+        for i in range(1, len(rows)):
+            if rows[i-1][0] - rows[i][1] > g.conf.break_period:
+                break
+            period += rows[i][2]
+            started = rows[i][0]
+
+        if g.active or now - rows[0][1] < g.conf.break_period:
+            need_break = period > g.conf.work_period
+    return fix_slots(
+        'Last', period=period, started=started, need_break=need_break
+    )
 
 
 def get_report(g, interval=None):
