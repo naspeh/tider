@@ -84,11 +84,14 @@ def get_config(file):
 
     parser = ConfigParser(defaults=defaults)
     if os.path.exists(file):
-        parser.read(file)
+        with open(file) as f:
+            src = f.read()
     else:
-        parser.read_dict({'default': {}})
-
+        src = ''
+    src = '[default]\n' + src
+    parser.read_string(src)
     parser = parser['default']
+
     conf = {}
     defaults_dict = dict(DEFAULTS)
     for k, v in parser.items():
@@ -917,7 +920,7 @@ def process_args(args):
             for k, v in DEFAULTS:
                 line = '{}={}'.format(k, v[0] if v[0] else '')
                 result.append(line)
-            print('[default]\n' + '\n'.join(result))
+            print('\n'.join(result))
     else:
         raise ValueError('Wrong subcommand')
 
