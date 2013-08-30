@@ -39,6 +39,7 @@ DEFAULTS = (
     ('hide_win', ('no', 'boolean')),
     ('win_move_x', (None, 'int')),
     ('win_move_y', (None, 'int')),
+    ('sqlite_manager', ('sqlite3', '')),
     ('xfce_enable', ('no', 'boolean')),
     ('xfce_tooltip', ('yes', 'boolean')),
     ('xfce_click', ('no', 'boolean')),
@@ -861,7 +862,7 @@ def parse_interval(interval):
 def process_args(args):
     g = get_context()
     parser = argparse.ArgumentParser()
-    subs = parser.add_subparsers()
+    subs = parser.add_subparsers(title='subcommands')
 
     def sub(name, **kw):
         sub = subs.add_parser(name, **kw)
@@ -876,9 +877,10 @@ def process_args(args):
         .arg('-d', '--daily', action='store_true', help='daily report')\
         .arg('-i', '--interval', help='YYYYMMDD, MMDD, DD or pair via "-"')
 
-    sub('db', help='enter to sqlite session')
+    sub('db', help='enter to sqlite session')\
+        .arg('--manager', default=g.conf.sqlite_manager, help='sqlite manager')
 
-    sub('print', help='print examples')\
+    sub('get', help='print examples')\
         .arg('name', help='choice name', choices=['conf', 'xfce', 'i3bar'])
 
     args = parser.parse_args(args)
@@ -905,9 +907,9 @@ def process_args(args):
         print(result)
 
     elif args.sub == 'db':
-        shell_call('sqlite3 {}'.format(g.path.db))
+        shell_call('{} {}'.format(args.manager, g.path.db))
 
-    elif args.sub == 'print':
+    elif args.sub == 'get':
         if args.name == 'xfce':
             print(
                 'Add "xfce_enable=yes" to config.\n'
