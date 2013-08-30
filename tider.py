@@ -455,11 +455,11 @@ def create_menu(g):
 
 def get_stats(g, detailed=True):
     if not g.start:
-        result = ('<b>Tider is disabled</b>')
+        status = ('<b>Tider is disabled</b>')
     else:
-        result = (
+        status = (
             '<b><big>Currently {state}</big></b>\n'
-            '  <b>{target}: {duration}</b> (from {started})'
+            '  <b>{target}: {duration}</b> from {started}'
             .format(
                 state='working' if g.active else 'break',
                 target=g.target,
@@ -467,16 +467,20 @@ def get_stats(g, detailed=True):
                 duration=str_seconds(time.time() - g.start)
             )
         )
-    last_working = get_last_working(g)
-    last_working_str = (
-        '<b>Last working period: {}</b>'
-        .format(str_seconds(last_working.period))
+    last_w = get_last_working(g)
+    last_working = (
+        '<b>Last working period</b>\n'
+        '  <b>{period}</b> from {started}'
+        .format(
+            period=str_seconds(last_w.period),
+            started=time.strftime('%H:%M', time.localtime(last_w.started))
+        )
     )
-    if g.active and last_working.need_break:
-        last_working_str += '\n<b>Need a break!</b>'
-    elif not g.active and not last_working.need_break:
-        last_working_str += '\n<b>Can work again!</b>'
-    result = [result, last_working_str]
+    if g.active and last_w.need_break:
+        last_working += '\n  <b>Need a break!</b>'
+    elif not g.active and not last_w.need_break:
+        last_working += '\n  <b>Can work again!</b>'
+    result = [status, last_working]
     if detailed:
         result += [get_report(g)]
     result = '\n\n'.join(result)
@@ -803,7 +807,7 @@ def get_report(g, interval=None):
         row = rows[0]
         line = '  {}: {}'.format(row[0], str_seconds(row[1]))
         if row[2]:
-            line += ' (and breaks: {})'.format(str_seconds(row[2]))
+            line += ' (and breaks {})'.format(str_seconds(row[2]))
         result += [line]
     elif len(rows) > 1:
         details = []
