@@ -468,20 +468,29 @@ def get_stats(g, detailed=True):
                 duration=str_seconds(time.time() - g.start)
             )
         )
+    result = [status]
+
     last_w = get_last_working(g)
-    last_working = (
-        '<b>Last working period</b>\n'
-        '  <b>{period}</b> from {started}'
-        .format(
-            period=str_seconds(last_w.period),
-            started=time.strftime('%H:%M', time.localtime(last_w.started))
+    if last_w.period:
+        last_working = (
+            '<b>Last working period</b>\n'
+            '  <b>{period}</b>'
+            .format(period=str_seconds(last_w.period))
         )
-    )
-    if g.active and last_w.need_break:
-        last_working += '\n  <b>Need a break!</b>'
-    elif not g.active and not last_w.need_break:
-        last_working += '\n  <b>Can work again!</b>'
-    result = [status, last_working]
+        if g.active:
+            last_working += ' from {}'.format(
+                time.strftime('%H:%M', time.localtime(last_w.started))
+            )
+        else:
+            last_working += ' till {}'.format(
+                time.strftime('%H:%M', time.localtime(last_w.ended))
+            )
+        if g.active and last_w.need_break:
+            last_working += '\n  <b>Need a break!</b>'
+        elif not g.active and not last_w.need_break:
+            last_working += '\n  <b>Can work again!</b>'
+        result += [last_working]
+
     if detailed:
         result += [get_report(g)]
     result = '\n\n'.join(result)
@@ -764,9 +773,11 @@ def get_last_working(g):
         rows.insert(0, (g.start, now, now - g.start))
 
     if not rows:
-        period, started, need_break = 0, None, False
+        period, need_break = 0, False
+        started = ended = None
     else:
-        period, started, need_break = rows[0][2], rows[0][0], False
+        period, need_break = rows[0][2], False
+        started, ended = rows[0][0], rows[0][1]
         for i in range(1, len(rows)):
             if rows[i-1][0] - rows[i][1] > g.conf.break_period:
                 break
@@ -776,7 +787,8 @@ def get_last_working(g):
         if g.active or now - rows[0][1] < g.conf.break_period:
             need_break = period > g.conf.work_period
     return fix_slots(
-        'Last', period=period, started=started, need_break=need_break
+        'Last', period=period, need_break=need_break,
+        started=started, ended=ended
     )
 
 
