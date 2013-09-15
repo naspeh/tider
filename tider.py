@@ -877,27 +877,30 @@ def process_args(args):
     subs = parser.add_subparsers(title='subcommands')
 
     def sub(name, **kw):
-        sub = subs.add_parser(name, **kw)
-        sub.set_defaults(sub=name)
-        sub.arg = lambda *a, **kw: sub.add_argument(*a, **kw) and sub
-        return sub
+        s = subs.add_parser(name, **kw)
+        s.set_defaults(sub=name)
+        s.arg = lambda *a, **kw: s.add_argument(*a, **kw) and s
+        s.exe = lambda f: s.set_defaults(exe=f) and s
+        return s
 
     sub('call', help='call a specific action')\
-        .arg('action', help='choice action', choices=run_server.actions.keys())
+        .arg('name', choices=run_server.actions.keys(), help='choice action')\
+        .exe(lambda a: print(send_action(g, a.name)))
 
     sub('report', aliases=['re'], help='print report')\
         .arg('-d', '--daily', action='store_true', help='daily report')\
         .arg('-i', '--interval', help='YYYYMMDD, MMDD, DD or pair via "-"')
 
     sub('db', help='enter to sqlite session')\
-        .arg('--manager', default=g.conf.sqlite_manager, help='sqlite manager')
+        .arg('--cmd', default=g.conf.sqlite_manager, help='sqlite manager')\
+        .exe(lambda a: shell_call('{} {}'.format(a.cmd, g.path.db)))
 
     sub('get', help='print examples')\
         .arg('name', help='choice name', choices=['conf', 'xfce', 'i3bar'])
 
     args = parser.parse_args(args)
-    if args.sub == 'call':
-        print(send_action(g, args.action))
+    if hasattr(args, 'exe'):
+        args.exe(args)
 
     elif args.sub == 'report':
         interval = result = []
@@ -917,9 +920,6 @@ def process_args(args):
         result = '\n\n'.join(result)
         result = re.sub(r'<[^>]+>', '', result)
         print(result)
-
-    elif args.sub == 'db':
-        shell_call('{} {}'.format(args.manager, g.path.db))
 
     elif args.sub == 'get':
         if args.name == 'xfce':
