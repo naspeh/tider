@@ -5,8 +5,8 @@ import subprocess
 
 from tider import RELOAD
 
-cmd = ['python', os.path.join(os.path.dirname(__file__), 'tider.py')]
-cmd += sys.argv[1:]
+cmd = os.path.join(os.path.dirname(os.path.realpath(__file__)), 'tider.py')
+cmd = ['python', cmd] + sys.argv[1:]
 try:
     code = subprocess.call(cmd)
     if code == RELOAD:
