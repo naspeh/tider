@@ -156,13 +156,13 @@ class _FixedSlots:
     def __init__(self, **kw):
         defaults = dict((k, None) for k in self.__slots__)
         defaults.update(kw)
-        self._replace(**defaults)
+        self._update(**defaults)
 
     @property
     def _items(self):
         return [(k, getattr(self, k)) for k in self.__slots__]
 
-    def _replace(self, **kw):
+    def _update(self, **kw):
         for k, v in kw.items():
             setattr(self, k, v)
         return self
@@ -618,7 +618,7 @@ def set_last_state(g):
     if os.path.exists(g.path.last):
         with open(g.path.last, 'rb') as f:
             state = pickle.load(f)
-            g._replace(**state)
+            g._update(**state)
 
     if os.path.exists(g.path.stats):
         with open(g.path.stats, 'r') as f:
@@ -874,28 +874,28 @@ def parse_interval(interval):
 def process_args(args):
     g = get_context()
     parser = argparse.ArgumentParser()
-    subs = parser.add_subparsers(title='subcommands')
+    cmds = parser.add_subparsers(title='commands')
 
-    def sub(name, **kw):
-        s = subs.add_parser(name, **kw)
+    def cmd(name, **kw):
+        s = cmds.add_parser(name, **kw)
         s.set_defaults(sub=name)
         s.arg = lambda *a, **kw: s.add_argument(*a, **kw) and s
         s.exe = lambda f: s.set_defaults(exe=f) and s
         return s
 
-    sub('call', help='call a specific action')\
+    cmd('call', help='call a specific action')\
         .arg('name', choices=run_server.actions.keys(), help='choice action')\
         .exe(lambda a: print(send_action(g, a.name)))
 
-    sub('report', aliases=['re'], help='print report')\
+    cmd('report', aliases=['re'], help='print report')\
         .arg('-d', '--daily', action='store_true', help='daily report')\
         .arg('-i', '--interval', help='YYYYMMDD, MMDD, DD or pair via "-"')
 
-    sub('db', help='enter to sqlite session')\
+    cmd('db', help='enter to sqlite session')\
         .arg('--cmd', default=g.conf.sqlite_manager, help='sqlite manager')\
         .exe(lambda a: shell_call('{} {}'.format(a.cmd, g.path.db)))
 
-    sub('get', help='print examples')\
+    cmd('get', help='print examples')\
         .arg('name', help='choice name', choices=['conf', 'xfce', 'i3bar'])
 
     args = parser.parse_args(args)
