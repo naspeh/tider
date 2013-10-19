@@ -878,7 +878,7 @@ def process_args(args):
 
     def cmd(name, **kw):
         s = cmds.add_parser(name, **kw)
-        s.set_defaults(sub=name)
+        s.set_defaults(cmd=name)
         s.arg = lambda *a, **kw: s.add_argument(*a, **kw) and s
         s.exe = lambda f: s.set_defaults(exe=f) and s
         return s
@@ -902,7 +902,7 @@ def process_args(args):
     if hasattr(args, 'exe'):
         args.exe(args)
 
-    elif args.sub == 'report':
+    elif args.cmd == 'report':
         interval = result = []
         if args.interval:
             interval_ = parse_interval(args.interval)
@@ -921,7 +921,7 @@ def process_args(args):
         result = re.sub(r'<[^>]+>', '', result)
         print(result)
 
-    elif args.sub == 'get':
+    elif args.cmd == 'get':
         if args.name == 'xfce':
             print(
                 'Add "xfce_enable=yes" to config.\n'
