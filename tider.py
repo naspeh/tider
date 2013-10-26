@@ -877,11 +877,11 @@ def process_args(args):
     cmds = parser.add_subparsers(title='commands')
 
     def cmd(name, **kw):
-        s = cmds.add_parser(name, **kw)
-        s.set_defaults(cmd=name)
-        s.arg = lambda *a, **kw: s.add_argument(*a, **kw) and s
-        s.exe = lambda f: s.set_defaults(exe=f) and s
-        return s
+        p = cmds.add_parser(name, **kw)
+        p.set_defaults(cmd=name)
+        p.arg = lambda *a, **kw: p.add_argument(*a, **kw) and p
+        p.exe = lambda f: p.set_defaults(exe=f) and p
+        return p
 
     cmd('call', help='call a specific action')\
         .arg('name', choices=run_server.actions.keys(), help='choice action')\
