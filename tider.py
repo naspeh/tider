@@ -144,7 +144,9 @@ def get_context():
         'reload': False,
         'last_overwork': None,
     })
-    set_last_state(g)
+    g._update(**get_last_state(g))
+
+    update_all(g)
     return g
 
 
@@ -614,17 +616,18 @@ def update_all(g):
     return True
 
 
-def set_last_state(g):
+def get_last_state(g):
+    last_state = {}
     if os.path.exists(g.path.last):
         with open(g.path.last, 'rb') as f:
             state = pickle.load(f)
-            g._update(**state)
+            last_state.update(state)
 
     if os.path.exists(g.path.stats):
         with open(g.path.stats, 'r') as f:
-            g.stats = f.read()
+            last_state['stats'] = f.read()
 
-    update_all(g)
+    return last_state
 
 
 def connect_db(db_path):
