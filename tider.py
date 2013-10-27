@@ -103,7 +103,7 @@ def get_config(file):
         else:
             conf[k] = None
 
-    return fix_slots('Conf', **conf)
+    return fix_slots('Conf', conf)
 
 
 def get_paths():
@@ -117,35 +117,33 @@ def get_paths():
         os.mkdir(app_dir)
 
     app_dir = app_dir + os.path.sep
-    return fix_slots(
-        'Paths',
-        conf=app_dir + 'config.ini',
-        sock=app_dir + 'server.sock',
-        db=app_dir + 'log.db',
-        img=app_dir + 'status.png',
-        last=app_dir + 'last.txt',
-        stats=app_dir + 'stats.txt',
-        xfce=app_dir + 'xfce.txt',
-        i3bar=app_dir + 'i3bar.txt'
-    )
+    return fix_slots('Paths', {
+        'conf': app_dir + 'config.ini',
+        'sock': app_dir + 'server.sock',
+        'db': app_dir + 'log.db',
+        'img': app_dir + 'status.png',
+        'last': app_dir + 'last.txt',
+        'stats': app_dir + 'stats.txt',
+        'xfce': app_dir + 'xfce.txt',
+        'i3bar': app_dir + 'i3bar.txt'
+    })
 
 
 def get_context():
     paths = get_paths()
-    g = fix_slots(
-        'Context',
-        path=paths,
-        conf=get_config(paths.conf),
-        db=connect_db(paths.db),
-        start=None,
-        last=None,
-        active=False,
-        target=None,
-        stats=None,
-        ui=None,
-        reload=False,
-        last_overwork=None,
-    )
+    g = fix_slots('Context', {
+        'path': paths,
+        'conf': get_config(paths.conf),
+        'db': connect_db(paths.db),
+        'start': None,
+        'last': None,
+        'active': False,
+        'target': None,
+        'stats': None,
+        'ui': None,
+        'reload': False,
+        'last_overwork': None,
+    })
     set_last_state(g)
     return g
 
@@ -174,7 +172,7 @@ class _FixedSlots:
         )
 
 
-def fix_slots(name, **fields):
+def fix_slots(name, fields):
     cls = type(name, (_FixedSlots, ), {})
     cls.__slots__ = fields.keys()
     return cls(**fields)
@@ -339,7 +337,9 @@ def create_ui(g):
 
     update()
     GObject.timeout_add(g.conf.update_period, lambda: not g.start or update())
-    return fix_slots('UI', update=update, popup_menu=menu.popup_default)
+    return fix_slots('UI', {
+        'update': update, 'popup_menu': menu.popup_default
+    })
 
 
 def create_tray(g, menu):
@@ -746,9 +746,9 @@ def tmp_file(filename, suffix='.tmp', mode=None):
 
 
 def split_seconds(v):
-    return fix_slots(
-        'Duration', h=int(v / 60 / 60), m=int(v / 60 % 60), s=int(v % 60),
-    )
+    return fix_slots('Duration', {
+        'h': int(v / 60 / 60), 'm': int(v / 60 % 60), 's': int(v % 60)
+    })
 
 
 def str_seconds(duration):
@@ -786,10 +786,10 @@ def get_last_working(g):
 
         if g.active or now - rows[0][1] < g.conf.break_period:
             need_break = period > g.conf.work_period
-    return fix_slots(
-        'Last', period=period, need_break=need_break,
-        started=started, ended=ended
-    )
+    return fix_slots('Last', {
+        'period': period, 'need_break': need_break,
+        'started': started, 'ended': ended
+    })
 
 
 def get_report(g, interval=None):
