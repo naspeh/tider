@@ -10,7 +10,6 @@ license=('BSD')
 depends=('python-cairo' 'python-gobject' 'gtk3')
 makedepends=('git')
 provides=('tider')
-replace=('tider')
 source=('git+https://github.com/naspeh/tider.git')
 sha256sums=('SKIP')
 
