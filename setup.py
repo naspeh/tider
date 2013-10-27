@@ -14,12 +14,12 @@ setup(
     description='Lightweight GTK+ time tracker',
     long_description=desc,
     license='BSD',
-    version='alfa',
+    version='beta',
     author='naspeh',
     author_email='naspeh@ya.ru',
     url='http://github.com/naspeh/tider/',
     classifiers=[
-        'Development Status :: 3 - Alpha',
+        'Development Status :: 4 - Beta',
         'Environment :: X11 Applications :: GTK',
         'Intended Audience :: End Users/Desktop',
         'License :: OSI Approved :: BSD License',
@@ -27,8 +27,8 @@ setup(
         'Programming Language :: Python :: 3',
         'Topic :: Office/Business'
     ],
+    platforms='any',
     py_modules=['tider'],
     scripts=['tider'],
-    platforms='any',
     cmdclass={'build_py': build_py}
 )
