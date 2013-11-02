@@ -859,10 +859,10 @@ def prepare_xfce(g):
 
 def parse_interval(interval):
     result = None
-    for prefix in ['', '%Y%m', '%Y']:
+    for prefix in ['', '%m%Y', '%Y']:
         try:
-            value = [time.strftime(prefix + i) for i in interval.split('-', 1)]
-            result = [time.strptime(i, '%Y%m%d') for i in value]
+            value = [time.strftime(i + prefix) for i in interval.split('-', 1)]
+            result = [time.strptime(i, '%d%m%Y') for i in value]
             break
         except ValueError:
             pass
@@ -892,7 +892,7 @@ def process_args(args):
 
     cmd('report', aliases=['re'], help='print report')\
         .arg('-d', '--daily', action='store_true', help='daily report')\
-        .arg('-i', '--interval', help='YYYYMMDD, MMDD, DD or pair via "-"')
+        .arg('-i', '--interval', help='DD, DDMM, DDMMYYYY or pair via "-"')
 
     cmd('db', help='enter to sqlite session')\
         .arg('--cmd', default=g.conf.sqlite_manager, help='sqlite manager')\
