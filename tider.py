@@ -923,7 +923,7 @@ def process_args(args):
                     check = lambda: (
                         int(time.strftime('%d', time.localtime(next_))) == 1
                         if args.monthly else
-                        int(time.strftime('%w', time.localtime(next_))) == 0
+                        int(time.strftime('%w', time.localtime(next_))) == 1
                     )
                     if check() or next_ > end:
                         interval_ = [
