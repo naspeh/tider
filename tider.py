@@ -891,8 +891,10 @@ def process_args(args):
         .exe(lambda a: print(send_action(g, a.name)))
 
     cmd('report', aliases=['re'], help='print report')\
+        .arg('-i', '--interval', help='DD, DDMM, DDMMYYYY or pair via "-"')\
         .arg('-d', '--daily', action='store_true', help='daily report')\
-        .arg('-i', '--interval', help='DD, DDMM, DDMMYYYY or pair via "-"')
+        .arg('-w', '--weekly', action='store_true', help='weekly report')\
+        .arg('-m', '--monthly', action='store_true', help='monthly report')
 
     cmd('db', help='enter to sqlite session')\
         .arg('--cmd', default=g.conf.sqlite_manager, help='sqlite manager')\
@@ -910,14 +912,28 @@ def process_args(args):
         if args.interval:
             interval_ = parse_interval(args.interval)
             interval = [time.strftime(SQL_DATE, i) for i in interval_]
-        if args.daily and len(interval) == 2:
-            result = []
-            begin = time.mktime(interval_[0])
-            end = time.mktime(interval_[1])
+        if len(interval) == 2 and (args.daily or args.weekly or args.monthly):
             day = 60 * 60 * 24
+            begin, end = [time.mktime(i) for i in interval_]
+            begin_ = begin
             for i in range(int((end - begin) / day) + 1):
-                current = time.localtime(begin + i * day)
-                result += [get_report(g, [time.strftime(SQL_DATE, current)])]
+                cur = begin + i * day
+                if args.monthly or args.weekly:
+                    next_ = begin + day * (i + 1)
+                    check = lambda: (
+                        int(time.strftime('%d', time.localtime(next_))) == 1
+                        if args.monthly else
+                        int(time.strftime('%w', time.localtime(next_))) == 0
+                    )
+                    if check() or next_ > end:
+                        interval_ = [
+                            time.strftime(SQL_DATE, time.localtime(begin_)),
+                            time.strftime(SQL_DATE, time.localtime(cur))
+                        ]
+                        begin_ = next_
+                        result += [get_report(g, interval_)]
+                else:
+                    result += [get_report(g, [time.strftime(SQL_DATE, cur)])]
 
         result += [get_report(g, interval)]
         result = '\n\n'.join(result)
