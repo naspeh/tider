@@ -609,9 +609,10 @@ def update_all(g):
                 message = 'Working: ' + f_seconds(last_working.period)
                 if overtime:
                     message += '\nOverworking: ' + f_seconds(overtime)
+                urgent = '-u critical' if overtime > g.conf.work_period else ''
                 shell_call(
-                    'notify-send -t {} "Take a break!" "{}"'
-                    .format(int(g.conf.overwork_period * 500), message)
+                    'notify-send -t {} {} "Take a break!" "{}"'
+                    .format(int(g.conf.overwork_period * 500), urgent, message)
                 )
     return True
 
