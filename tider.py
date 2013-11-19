@@ -796,20 +796,23 @@ def get_last_working(g):
     })
 
 
-def get_report(g, interval=None):
+def get_report(g, interval=None, like=None):
     if not interval:
         interval = [time.strftime(SQL_DATE)]
 
     if len(interval) == 1:
         interval = interval * 2
 
+    like = like if like else '%%'
+
     cursor = g.db.cursor()
     cursor.execute(
         'SELECT target, SUM(work), SUM(break) FROM log'
-        '   WHERE date(start, "unixepoch", "localtime") BETWEEN ? AND ?'
+        '   WHERE date(start, "unixepoch", "localtime") BETWEEN ? AND ?' +
+        ('  AND target like ?' if like else '') +
         '   GROUP BY target'
         '   ORDER BY 2 DESC',
-        interval
+        interval + [like] if like else []
     )
     rows = cursor.fetchall()
 
@@ -895,7 +898,8 @@ def process_args(args):
         .arg('-i', '--interval', help='DD, DDMM, DDMMYYYY or pair via "-"')\
         .arg('-d', '--daily', action='store_true', help='daily report')\
         .arg('-w', '--weekly', action='store_true', help='weekly report')\
-        .arg('-m', '--monthly', action='store_true', help='monthly report')
+        .arg('-m', '--monthly', action='store_true', help='monthly report')\
+        .arg('-f', '--filter', help='filter targets (sqlite like syntax)')
 
     cmd('db', help='enter to sqlite session')\
         .arg('--cmd', default=g.conf.sqlite_manager, help='sqlite manager')\
@@ -914,6 +918,14 @@ def process_args(args):
             interval_ = parse_interval(args.interval)
             interval = [time.strftime(SQL_DATE, i) for i in interval_]
         if len(interval) == 2 and (args.daily or args.weekly or args.monthly):
+            to_sqldate = lambda t: time.strftime(SQL_DATE, time.localtime(t))
+            # Is first day in month or week
+            is_firstday = lambda t: (
+                int(time.strftime('%d', time.localtime(t))) == 1
+                if args.monthly else
+                int(time.strftime('%w', time.localtime(t))) == 1
+            )
+
             day = 60 * 60 * 24
             begin, end = [time.mktime(i) for i in interval_]
             begin_ = begin
@@ -921,22 +933,15 @@ def process_args(args):
                 cur = begin + i * day
                 if args.monthly or args.weekly:
                     next_ = begin + day * (i + 1)
-                    check = lambda: (
-                        int(time.strftime('%d', time.localtime(next_))) == 1
-                        if args.monthly else
-                        int(time.strftime('%w', time.localtime(next_))) == 1
-                    )
-                    if check() or next_ > end:
-                        interval_ = [
-                            time.strftime(SQL_DATE, time.localtime(begin_)),
-                            time.strftime(SQL_DATE, time.localtime(cur))
-                        ]
+                    if is_firstday(next_) or next_ > end:
+                        interval_ = [to_sqldate(begin_), to_sqldate(cur)]
+                        result += [get_report(g, interval_, args.filter)]
                         begin_ = next_
-                        result += [get_report(g, interval_)]
                 else:
-                    result += [get_report(g, [time.strftime(SQL_DATE, cur)])]
+                    interval_ = [to_sqldate(cur)]
+                    result += [get_report(g, interval_, args.filter)]
 
-        result += [get_report(g, interval)]
+        result += [get_report(g, interval, args.filter)]
         result = '\n\n'.join(result)
         result = re.sub(r'<[^>]+>', '', result)
         print(result)
