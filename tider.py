@@ -1,6 +1,7 @@
 import argparse
 import json
 import os
+import math
 import pickle
 import re
 import signal
@@ -933,11 +934,11 @@ def process_args(args):
             day = 60 * 60 * 24
             begin, end = [time.mktime(i) for i in interval_]
             begin_ = begin
-            for i in range(int((end - begin) / day) + 1):
+            for i in range(math.ceil((end - begin) / day) + 1):
                 cur = begin + i * day
                 if args.monthly or args.weekly:
                     next_ = begin + day * (i + 1)
-                    if is_firstday(next_) or next_ > end:
+                    if is_firstday(next_) or cur >= end:
                         interval_ = [strftime(begin_), strftime(cur)]
                         label = None
                         if args.monthly:
