@@ -796,7 +796,7 @@ def get_last_working(g):
     })
 
 
-def get_report(g, interval=None, like=None):
+def get_report(g, interval=None, like=None, label=None):
     if not interval:
         interval = [time.strftime(SQL_DATE)]
 
@@ -816,7 +816,9 @@ def get_report(g, interval=None, like=None):
     )
     rows = cursor.fetchall()
 
-    if interval[0] == interval[1]:
+    if label:
+        result = ['<b>Statistics {}</b>'.format(label)]
+    elif interval[0] == interval[1]:
         result = ['<b>Statistics for {}</b>'.format(interval[0])]
     else:
         result = ['<b>Statistics from {} to {}</b>'.format(*interval)]
@@ -899,7 +901,7 @@ def process_args(args):
         .arg('-d', '--daily', action='store_true', help='daily report')\
         .arg('-w', '--weekly', action='store_true', help='weekly report')\
         .arg('-m', '--monthly', action='store_true', help='monthly report')\
-        .arg('-f', '--filter', help='filter targets (sqlite like syntax)')
+        .arg('-f', '--like', help='filter targets (sqlite like syntax)')
 
     cmd('db', help='enter to sqlite session')\
         .arg('--cmd', default=g.conf.sqlite_manager, help='sqlite manager')\
@@ -918,7 +920,9 @@ def process_args(args):
             interval_ = parse_interval(args.interval)
             interval = [time.strftime(SQL_DATE, i) for i in interval_]
         if len(interval) == 2 and (args.daily or args.weekly or args.monthly):
-            to_sqldate = lambda t: time.strftime(SQL_DATE, time.localtime(t))
+            strftime = lambda t, f=SQL_DATE: (
+                time.strftime(f, time.localtime(t))
+            )
             # Is first day in month or week
             is_firstday = lambda t: (
                 int(time.strftime('%d', time.localtime(t))) == 1
@@ -934,14 +938,21 @@ def process_args(args):
                 if args.monthly or args.weekly:
                     next_ = begin + day * (i + 1)
                     if is_firstday(next_) or next_ > end:
-                        interval_ = [to_sqldate(begin_), to_sqldate(cur)]
-                        result += [get_report(g, interval_, args.filter)]
+                        interval_ = [strftime(begin_), strftime(cur)]
+                        label = None
+                        if args.monthly:
+                            label = (
+                                strftime(cur, 'for %B %Y')
+                                if is_firstday(begin_) and is_firstday(next_)
+                                else None
+                            )
+                        result += [get_report(g, interval_, args.like, label)]
                         begin_ = next_
                 else:
-                    interval_ = [to_sqldate(cur)]
-                    result += [get_report(g, interval_, args.filter)]
+                    interval_ = [strftime(cur)]
+                    result += [get_report(g, interval_, args.like)]
 
-        result += [get_report(g, interval, args.filter)]
+        result += [get_report(g, interval, args.like)]
         result = '\n\n'.join(result)
         result = re.sub(r'<[^>]+>', '', result)
         print(result)
