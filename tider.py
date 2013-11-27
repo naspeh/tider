@@ -902,7 +902,7 @@ def process_args(args):
         .arg('-d', '--daily', action='store_true', help='daily report')\
         .arg('-w', '--weekly', action='store_true', help='weekly report')\
         .arg('-m', '--monthly', action='store_true', help='monthly report')\
-        .arg('-f', '--like', help='filter targets (sqlite like syntax)')
+        .arg('-t', '--target', help='filter targets (sqlite like syntax)')
 
     cmd('db', help='enter to sqlite session')\
         .arg('--cmd', default=g.conf.sqlite_manager, help='sqlite manager')\
@@ -936,10 +936,11 @@ def process_args(args):
             begin_ = begin
             for i in range(math.ceil((end - begin) / day) + 1):
                 cur = begin + i * day
-                if args.monthly or args.weekly:
+                if args.daily:
+                    result += [get_report(g, [strftime(cur)], args.target)]
+                else:
                     next_ = begin + day * (i + 1)
                     if is_firstday(next_) or cur >= end:
-                        interval_ = [strftime(begin_), strftime(cur)]
                         label = None
                         if args.monthly:
                             label = (
@@ -947,13 +948,11 @@ def process_args(args):
                                 if is_firstday(begin_) and is_firstday(next_)
                                 else None
                             )
-                        result += [get_report(g, interval_, args.like, label)]
+                        between = [strftime(begin_), strftime(cur)]
+                        result += [get_report(g, between, args.target, label)]
                         begin_ = next_
-                else:
-                    interval_ = [strftime(cur)]
-                    result += [get_report(g, interval_, args.like)]
 
-        result += [get_report(g, interval, args.like)]
+        result += [get_report(g, interval, args.target)]
         result = '\n\n'.join(result)
         result = re.sub(r'<[^>]+>', '', result)
         print(result)
