@@ -57,7 +57,7 @@ shell_call = lambda cmd: subprocess.call(cmd, shell=True)
 def tider():
     g = get_context()
     if os.path.exists(g.path.sock):
-        if send_action(g, 'ping') == 'pong':
+        if send_action(g, 'ping') == 'ok':
             print('Another `tider` instance already run.')
             raise SystemExit(1)
         else:
@@ -703,12 +703,9 @@ def run_server(g):
             if not data:
                 break
             action = data.decode()
-            if action == 'ping':
-                conn.send('pong'.encode())
-            else:
-                action = run_server.actions.get(data.decode())
-                GObject.idle_add(action, g)
-                conn.send('ok'.encode())
+            action = run_server.actions.get(action)
+            GObject.idle_add(action, g)
+            conn.send('ok'.encode())
     conn.close()
 
 run_server.actions = {
@@ -719,7 +716,7 @@ run_server.actions = {
     'reload': lambda g: main_quit(g, reload=True),
     'quit': lambda g: main_quit(g),
     'report': lambda g: show_report(g),
-    'ping': None
+    'ping': lambda g: None
 }
 
 
