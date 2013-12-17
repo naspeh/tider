@@ -2,22 +2,16 @@
 
 pkgname=tider-git
 pkgver=0.0.0
-pkgrel=4
-pkgdesc=$(head -n1 README.rst)
+pkgrel=5
+pkgdesc='Time tracker with labels and history (lightweight GTK+)'
 arch=('any')
 url='https://github.com/naspeh/tider'
 license=('BSD')
 depends=('python-gobject' 'gtk3')
 makedepends=('git')
 provides=('tider')
-source=(
-    'README.rst'
-    "$pkgname"::'git://github.com/naspeh/tider.git'
-)
-sha256sums=(
-    'SKIP'
-    'SKIP'
-)
+source=("$pkgname"::'git://github.com/naspeh/tider.git')
+sha256sums=('SKIP')
 
 pkgver() {
     cd "$pkgname"

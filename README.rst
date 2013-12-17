@@ -1,7 +1,9 @@
-Time tracker with labels and history (lightweight GTK+)
--------------------------------------------------------
-
+Time tracker (lightweight GTK+)
+-------------------------------
 **In development.**
+
+Support labels and history.
+
 
 Arch Linux
 ==========

@@ -6,13 +6,9 @@ if sys.version_info <= (3, 2):
     sys.stderr.write("Tider requires Python 3.2+\n")
     sys.exit(1)
 
-with open('README.rst', 'br') as f:
-    desc = f.read().decode()
-
 setup(
     name='tider',
-    description=desc.split('\n', 1)[0],
-    long_description=desc,
+    description='Time tracker with labels and history (lightweight GTK+)',
     license='BSD',
     version='beta',
     author='naspeh',
