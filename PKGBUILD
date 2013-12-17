@@ -2,12 +2,12 @@
 
 pkgname=tider-git
 pkgver=0.0.0
-pkgrel=3
+pkgrel=4
 pkgdesc='Lightweight GTK+ time tracker'
 arch=('any')
 url='https://github.com/naspeh/tider'
 license=('BSD')
-depends=('python-cairo' 'python-gobject' 'gtk3')
+depends=('python-gobject' 'gtk3')
 makedepends=('git')
 provides=('tider')
 source=("$pkgname"::'git://github.com/naspeh/tider.git')

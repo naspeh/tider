@@ -1,5 +1,4 @@
 import argparse
-import json
 import os
 import math
 import pickle
@@ -14,7 +13,6 @@ from contextlib import contextmanager
 from importlib.machinery import SourceFileLoader
 from threading import Thread
 
-import cairo
 from gi.repository import Gdk, Gtk, GObject
 
 GObject.threads_init()
@@ -23,34 +21,40 @@ RELOAD = 100
 SQL_DATE = '%Y-%m-%d'
 DEFAULT_CONFIG = '''
 def get(conf_dir):
-    c = {
-        'update_period': 500,  # in microseconds
-        'offline_timeout': 300,  # in seconds
-        'min_duration': 60,  # in seconds
-        'break_symbol': '*',
-        'break_period': 600,  # in seconds
-        'work_period': 3000,  # in seconds
-        'overwork_period': 300,  # in seconds
-        'height': 20,
-        'width': None,
-        'font_size': None,
-        'hide_tray': True,
-        'hide_win': False,
-        'win_move_x': None,
-        'win_move_y': None,
-        'sqlite_manager': 'sqlite3',
-        'xfce_enable': False,
-        'xfce_tooltip': True,
-        'xfce_click': False,
-        'i3bar_enable': False,
-        'i3bar_tmpl': '[{symbol} {duration} {target}]',
-        'i3bar_work_rgb': '#007700',
-        'i3bar_break_rgb': '#777777'
-    }
+    c = dict(
+        update_period=500,  # in microseconds
+        offline_timeout=300,  # in seconds
+        min_duration=60,  # in seconds
+        break_symbol='*',
+        break_period=600,  # in seconds
+        work_period=3000,  # in seconds
+        overwork_period=300,  # in seconds
+        hide_tray=True,
+        hide_win=False,
+        sqlite_manager='sqlite3',
+        win_hook=win_hook,
+        text_hook=text_hook
+    )
     return c
+
+
+def win_hook(win):
+    # Update window after creation
+    win.move(500, 2)
+
+
+def text_hook(ctx):
+    # Update window text
+    text = '[{symbol} {duration} {target}]'.format(
+        symbol='☭' if ctx.is_active else '☯',
+        duration=ctx.duration_text if ctx.is_start else 'Tider',
+        target=ctx.target
+    )
+    color = '#007700' if ctx.is_active else '#777777'
+    markup = '<span color="{}" font="11">{}</span>'.format(color, text)
+    return markup
 '''.strip()
 
-strip_tags = lambda r: re.sub(r'<[^>]+>', '', r)
 shell_call = lambda cmd: subprocess.call(cmd, shell=True)
 
 
@@ -130,6 +134,7 @@ def get_context():
         'last': None,
         'active': False,
         'target': None,
+        'text': None,
         'stats': None,
         'ui': None,
         'reload': False,
@@ -357,20 +362,15 @@ def create_tray(g, menu):
 
 
 def create_win(g):
-    img = Gtk.Image()
+    label = Gtk.Label()
     box = Gtk.EventBox()
-    box.add(img)
+    box.add(label)
 
-    win = Gtk.Window(
-        title='Tider', resizable=False, decorated=False,
-        skip_pager_hint=True, skip_taskbar_hint=True,
-        type=Gtk.WindowType.POPUP
-    )
+    win = Gtk.Window(title='Tider', type=Gtk.WindowType.POPUP)
     win.set_keep_above(True)
     win.add(box)
 
-    if g.conf.win_move_x is not None or g.conf.win_move_y is not None:
-        win.move(g.conf.win_move_x or 0, g.conf.win_move_y or 0)
+    g.conf.win_hook(win)
     win.show_all()
 
     win.connect('destroy', lambda w: main_quit(g))
@@ -378,8 +378,8 @@ def create_win(g):
     box.connect('button-press-event', lambda w, e: g.ui.popup_menu(e))
 
     def update():
-        img.set_from_file(g.path.img)
-        img.set_tooltip_markup(g.stats)
+        label.set_markup(g.text)
+        label.set_tooltip_markup(g.stats)
 
     win.update = update
     return win
@@ -505,62 +505,15 @@ def update_all(g):
         target = g.target if g.active else g.target + g.conf.break_symbol
         duration_text = '{}:{:02d}'.format(duration.h, duration.m)
 
-    if g.conf.xfce_enable or not g.conf.hide_win:
-        max_h = max(12, g.conf.height)
-        max_w = int(max_h * 4)
-        if g.conf.width:
-            max_w = max(max_w, g.conf.width)
-        padding = max_h * 0.125
-        box_h = max_h - 2 * padding
-        font_h = box_h * 0.77
-        if g.conf.font_size:
-            font_h = min(font_h, g.conf.font_size)
-        timer_w = max_h * 1.5
-
-        if g.start:
-            color = (0.6, 0.9, 0.6) if g.active else (0.8, 0.8, 0.83)
-            need_break = get_last_working(g).need_break
-            text_color = (0.5, 0, 0) if need_break else (0, 0, 0.5)
-        else:
-            color = (0.7, 0.7, 0.7)
-            text_color = (0, 0, 0)
-
-        src = cairo.ImageSurface(cairo.FORMAT_ARGB32, max_w, max_h)
-        ctx = cairo.Context(src)
-
-        ctx.set_source_rgb(1, 1, 1)
-        ctx.rectangle(0, 0, max_w, max_h)
-        ctx.fill()
-
-        ctx.set_line_width(1)
-        ctx.set_source_rgb(*color)
-        ctx.rectangle(0, 0, max_w, max_h)
-        ctx.stroke()
-        ctx.rectangle(0, 0, timer_w + padding / 2, max_h)
-        ctx.fill()
-
-        ctx.set_source_rgb(*text_color)
-        ctx.set_font_size(font_h)
-
-        text_w, text_h = ctx.text_extents(duration_text)[2:4]
-        ctx.move_to(timer_w - text_w - padding, font_h + padding)
-        ctx.show_text(duration_text)
-
-        ctx.move_to(timer_w + padding, font_h + padding)
-        ctx.show_text(target)
-
-        line_h = padding * 0.7
-        step_sec = 2
-        step_w = timer_w * step_sec / 60
-        duration_w = int(duration.s / step_sec) * step_w
-        ctx.set_line_width(line_h)
-        ctx.set_source_rgb(*text_color)
-        ctx.move_to(timer_w, max_h - line_h / 2)
-        ctx.line_to(timer_w - duration_w, max_h - line_h / 2)
-        ctx.stroke()
-
-        with tmp_file(g.path.img) as filename:
-            src.write_to_png(filename)
+    ctx = fix_slots('Ctx', {
+        'is_active': g.active,
+        'is_start': bool(g.start),
+        'duration': duration,
+        'duration_text': duration_text,
+        'target': target,
+        'conf_dir': g.conf.conf_dir
+    })
+    g.text = g.conf.text_hook(ctx)
 
     with tmp_file(g.path.last, mode='wb') as f:
         f.write(pickle.dumps({
@@ -568,24 +521,12 @@ def update_all(g):
             'active': g.active,
             'start': g.start,
             'last': g.last,
-            'last_overwork': g.last_overwork
+            'last_overwork': g.last_overwork,
+            'text': g.text
         }))
 
     with tmp_file(g.path.stats, mode='w') as f:
         f.write(g.stats)
-
-    if g.conf.xfce_enable:
-        prepare_xfce(g)
-
-    if g.conf.i3bar_enable:
-        full_text = g.conf.i3bar_tmpl.format(
-            symbol='☭' if g.active else '☯',
-            duration=duration_text if g.start else 'Tider',
-            target=target
-        )
-        color = g.conf.i3bar_work_rgb if g.active else g.conf.i3bar_break_rgb
-        with tmp_file(g.path.i3bar, mode='w') as f:
-            f.write(json.dumps({'full_text': full_text, 'color': color}))
 
     if g.conf.overwork_period and g.active:
         last_working = get_last_working(g)
@@ -838,19 +779,6 @@ def get_report(g, interval=None, like=None, label=None):
     return result
 
 
-def prepare_xfce(g):
-    result = '<img>{}</img>'.format(g.path.img)
-    if g.conf.xfce_click:
-        click = 'python {} do {}'.format(__file__, g.conf.xfce_click)
-        result += '<click>{}</click>'.format(click)
-    if g.conf.xfce_tooltip:
-        tooltip = strip_tags(get_stats(g, detailed=False))
-        result += '<tool>{}</tool>'.format(tooltip)
-
-    with tmp_file(g.path.xfce, mode='w') as f:
-        f.write(result)
-
-
 def parse_interval(interval):
     result = None
     for prefix in ['', '%m%Y', '%Y']:
@@ -895,8 +823,8 @@ def process_args(args):
         .arg('--cmd', default=g.conf.sqlite_manager, help='sqlite manager')\
         .exe(lambda a: shell_call('{} {}'.format(a.cmd, g.path.db)))
 
-    cmd('get', help='print examples')\
-        .arg('name', help='choice name', choices=['conf', 'xfce', 'i3bar'])
+    cmd('conf', help='print default config')\
+        .exe(lambda a: print(DEFAULT_CONFIG))
 
     args = parser.parse_args(args)
     if not hasattr(args, 'cmd'):
@@ -947,21 +875,6 @@ def process_args(args):
         result = re.sub(r'<[^>]+>', '', result)
         print(result)
 
-    elif args.cmd == 'get':
-        if args.name == 'xfce':
-            print(
-                'Add "xfce_enable=True" to config.\n'
-                'Command for xfce4-genmon-plugin:\n'
-                '$ cat {}'.format(g.path.xfce)
-            )
-        elif args.name == 'i3bar':
-            print(
-                'Add "i3bar_enable=True" to config.\n'
-                'Command for i3bar:\n'
-                '$ cat {}'.format(g.path.i3bar)
-            )
-        elif args.name == 'conf':
-            print(DEFAULT_CONFIG)
     else:
         raise ValueError('Wrong subcommand')
 
