@@ -1,15 +1,10 @@
-Lightweight GTK+ time tracker
------------------------------
+Time tracker with labels and history (lightweight GTK+)
+-------------------------------------------------------
 
-Reworking some functionality from workrave_ and hamster-applet_ to one lightweight tool.
+**In development.**
 
-P.S. In development.
-
-.. _workrave: http://www.workrave.org/
-.. _hamster-applet: http://projecthamster.wordpress.com/about/
-
-Archlinux
-=========
+Arch Linux
+==========
 ::
 
     $ yaourt -S tider-git

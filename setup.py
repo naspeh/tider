@@ -11,7 +11,7 @@ with open('README.rst', 'br') as f:
 
 setup(
     name='tider',
-    description='Lightweight GTK+ time tracker',
+    description=desc.split('\n', 1)[0],
     long_description=desc,
     license='BSD',
     version='beta',
