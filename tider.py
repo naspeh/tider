@@ -10,8 +10,8 @@ import sqlite3
 import subprocess
 import sys
 import time
-from configparser import ConfigParser
 from contextlib import contextmanager
+from importlib.machinery import SourceFileLoader
 from threading import Thread
 
 import cairo
@@ -21,34 +21,34 @@ GObject.threads_init()
 
 RELOAD = 100
 SQL_DATE = '%Y-%m-%d'
-APP_DIRS = [
-    os.path.join(os.path.dirname(__file__), 'var'),
-    os.path.join(os.path.expanduser('~'), '.config', 'tider')
-]
-DEFAULTS = (
-    ('update_period', ('500', 'int')),  # in microseconds
-    ('offline_timeout', ('300', 'int')),  # in seconds
-    ('min_duration', ('60',  'int')),  # in seconds
-    ('break_symbol', ('*', '')),
-    ('break_period', ('600', 'int')),  # in seconds
-    ('work_period', ('3000', 'int')),  # in seconds
-    ('overwork_period', ('300', 'int')),  # in seconds
-    ('height', ('20', 'int')),
-    ('width', (None, 'int')),
-    ('font_size', (None, 'int')),
-    ('hide_tray', ('yes', 'boolean')),
-    ('hide_win', ('no', 'boolean')),
-    ('win_move_x', (None, 'int')),
-    ('win_move_y', (None, 'int')),
-    ('sqlite_manager', ('sqlite3', '')),
-    ('xfce_enable', ('no', 'boolean')),
-    ('xfce_tooltip', ('yes', 'boolean')),
-    ('xfce_click', ('no', 'boolean')),
-    ('i3bar_enable', ('no', 'boolean')),
-    ('i3bar_tmpl', ('[{symbol} {duration} {target}]', '')),
-    ('i3bar_work_rgb', ('#007700', '')),
-    ('i3bar_break_rgb', ('#777777', ''))
-)
+DEFAULT_CONFIG = '''
+def get(conf_dir):
+    c = {
+        'update_period': 500,  # in microseconds
+        'offline_timeout': 300,  # in seconds
+        'min_duration': 60,  # in seconds
+        'break_symbol': '*',
+        'break_period': 600,  # in seconds
+        'work_period': 3000,  # in seconds
+        'overwork_period': 300,  # in seconds
+        'height': 20,
+        'width': None,
+        'font_size': None,
+        'hide_tray': True,
+        'hide_win': False,
+        'win_move_x': None,
+        'win_move_y': None,
+        'sqlite_manager': 'sqlite3',
+        'xfce_enable': False,
+        'xfce_tooltip': True,
+        'xfce_click': False,
+        'i3bar_enable': False,
+        'i3bar_tmpl': '[{symbol} {duration} {target}]',
+        'i3bar_work_rgb': '#007700',
+        'i3bar_break_rgb': '#777777'
+    }
+    return c
+'''.strip()
 
 strip_tags = lambda r: re.sub(r'<[^>]+>', '', r)
 shell_call = lambda cmd: subprocess.call(cmd, shell=True)
@@ -81,42 +81,31 @@ def tider():
             print('Tider closed.')
 
 
-def get_config(file):
-    defaults = dict((k, v[0]) for k, v in DEFAULTS)
-
-    parser = ConfigParser(defaults=defaults)
-    if os.path.exists(file):
-        with open(file) as f:
-            src = f.read()
+def get_config():
+    conf_dirs = [
+        os.path.join(os.path.dirname(__file__), 'var'),
+        os.path.join(os.path.expanduser('~'), '.config', 'tider')
+    ]
+    conf_dir = [p for p in conf_dirs if os.path.exists(p)]
+    if conf_dir:
+        conf_dir = conf_dir[0]
     else:
-        src = ''
-    src = '[default]\n' + src
-    parser.read_string(src)
-    parser = parser['default']
+        conf_dir = conf_dirs[-1]
+        os.mkdir(conf_dir)
 
-    conf = {}
-    defaults_dict = dict(DEFAULTS)
-    for k, v in parser.items():
-        if k not in defaults_dict:
-            raise KeyError('Wrong key: ' + k)
-        if parser.get(k):
-            conf[k] = getattr(parser, 'get' + defaults_dict[k][1])(k)
-        else:
-            conf[k] = None
+    conf_path = os.path.join(conf_dir, 'config.py')
+    if not os.path.exists(conf_path):
+        with open(conf_path, 'wb') as f:
+            f.write(DEFAULT_CONFIG.encode())
 
-    return fix_slots('Conf', conf)
+    loader = SourceFileLoader('config', conf_path)
+    config = loader.load_module('config')
+    config = config.get(conf_dir)
+    config['conf_dir'] = conf_dir
+    return fix_slots('Conf', config)
 
 
-def get_paths():
-    app_dir = APP_DIRS[-1]
-    for d in APP_DIRS:
-        if os.path.exists(d):
-            app_dir = d
-            break
-
-    if not os.path.exists(app_dir):
-        os.mkdir(app_dir)
-
+def get_paths(app_dir):
     app_dir = app_dir + os.path.sep
     return fix_slots('Paths', {
         'conf': app_dir + 'config.ini',
@@ -131,10 +120,11 @@ def get_paths():
 
 
 def get_context():
-    paths = get_paths()
+    conf = get_config()
+    paths = get_paths(conf.conf_dir)
     g = fix_slots('Context', {
         'path': paths,
-        'conf': get_config(paths.conf),
+        'conf': conf,
         'db': connect_db(paths.db),
         'start': None,
         'last': None,
@@ -960,22 +950,18 @@ def process_args(args):
     elif args.cmd == 'get':
         if args.name == 'xfce':
             print(
-                'Add "xfce_enable=yes" to config.\n'
+                'Add "xfce_enable=True" to config.\n'
                 'Command for xfce4-genmon-plugin:\n'
                 '$ cat {}'.format(g.path.xfce)
             )
         elif args.name == 'i3bar':
             print(
-                'Add "i3bar_enable=yes" to config.\n'
+                'Add "i3bar_enable=True" to config.\n'
                 'Command for i3bar:\n'
                 '$ cat {}'.format(g.path.i3bar)
             )
         elif args.name == 'conf':
-            result = []
-            for k, v in DEFAULTS:
-                line = '{}={}'.format(k, v[0] if v[0] else '')
-                result.append(line)
-            print('\n'.join(result))
+            print(DEFAULT_CONFIG)
     else:
         raise ValueError('Wrong subcommand')
 
