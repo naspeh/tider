@@ -112,14 +112,10 @@ def get_config():
 def get_paths(app_dir):
     app_dir = app_dir + os.path.sep
     return fix_slots('Paths', {
-        'conf': app_dir + 'config.ini',
         'sock': app_dir + 'server.sock',
         'db': app_dir + 'log.db',
-        'img': app_dir + 'status.png',
         'last': app_dir + 'last.txt',
         'stats': app_dir + 'stats.txt',
-        'xfce': app_dir + 'xfce.txt',
-        'i3bar': app_dir + 'i3bar.txt'
     })
 
 
