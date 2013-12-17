@@ -1,6 +1,7 @@
 import argparse
-import os
+import hashlib
 import math
+import os
 import pickle
 import re
 import signal
@@ -20,31 +21,11 @@ GObject.threads_init()
 RELOAD = 100
 SQL_DATE = '%Y-%m-%d'
 DEFAULT_CONFIG = '''
-def get(conf_dir):
-    c = dict(
-        update_period=500,  # in microseconds
-        offline_timeout=300,  # in seconds
-        min_duration=60,  # in seconds
-        break_symbol='*',
-        break_period=600,  # in seconds
-        work_period=3000,  # in seconds
-        overwork_period=300,  # in seconds
-        hide_tray=True,
-        hide_win=False,
-        sqlite_manager='sqlite3',
-        win_hook=win_hook,
-        text_hook=text_hook
-    )
-    return c
-
-
 def win_hook(win):
-    # Update window after creation
     win.move(500, 2)
 
 
 def text_hook(ctx):
-    # Update window text
     text = '[{symbol} {duration} {target}]'.format(
         symbol='☭' if ctx.is_active else '☯',
         duration=ctx.duration_text if ctx.is_start else 'Tider',
@@ -53,6 +34,22 @@ def text_hook(ctx):
     color = '#007700' if ctx.is_active else '#777777'
     markup = '<span color="{}" font="11">{}</span>'.format(color, text)
     return markup
+
+
+config = dict(
+    update_period=500,  # in microseconds
+    offline_timeout=300,  # in seconds
+    min_duration=60,  # in seconds
+    break_symbol='*',
+    break_period=600,  # in seconds
+    work_period=3000,  # in seconds
+    overwork_period=300,  # in seconds
+    hide_tray=True,
+    hide_win=False,
+    sqlite_manager='sqlite3',
+    win_hook=win_hook,  # update window after creation
+    text_hook=text_hook  # update window text
+)
 '''.strip()
 
 shell_call = lambda cmd: subprocess.call(cmd, shell=True)
@@ -103,16 +100,18 @@ def get_config():
             f.write(DEFAULT_CONFIG.encode())
 
     loader = SourceFileLoader('config', conf_path)
-    config = loader.load_module('config')
-    config = config.get(conf_dir)
-    config['conf_dir'] = conf_dir
-    return fix_slots('Conf', config)
+    conf = loader.load_module('config')
+    conf = conf.config
+    conf['conf_dir'] = conf_dir
+    return fix_slots('Conf', conf)
 
 
 def get_paths(app_dir):
     app_dir = app_dir + os.path.sep
+    sid = '='.join([app_dir, os.environ.get('XDG_SESSION_ID')])
+    sid = hashlib.md5(sid.encode()).hexdigest()
     return fix_slots('Paths', {
-        'sock': app_dir + 'server.sock',
+        'sock': '/tmp/perevod-%s' % sid,
         'db': app_dir + 'log.db',
         'last': app_dir + 'last.txt',
         'stats': app_dir + 'stats.txt',
