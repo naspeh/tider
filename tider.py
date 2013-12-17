@@ -909,7 +909,10 @@ def process_args(args):
         .arg('name', help='choice name', choices=['conf', 'xfce', 'i3bar'])
 
     args = parser.parse_args(args)
-    if hasattr(args, 'exe'):
+    if not hasattr(args, 'cmd'):
+        tider()
+
+    elif hasattr(args, 'exe'):
         args.exe(args)
 
     elif args.cmd == 'report':
@@ -980,9 +983,6 @@ def process_args(args):
 def main(args=None):
     if args is None:
         args = sys.argv[1:]
-
-    if not args:
-        return tider()
 
     try:
         process_args(args)
