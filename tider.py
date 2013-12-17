@@ -447,7 +447,7 @@ def create_menu(g):
     return menu
 
 
-def get_stats(g, detailed=True):
+def get_stats(g):
     if not g.start:
         status = ('<b>Tider is disabled</b>')
     else:
@@ -484,8 +484,7 @@ def get_stats(g, detailed=True):
             last_working += '\n  <b>Can work again!</b>'
         result += [last_working]
 
-    if detailed:
-        result += [get_report(g)]
+    result += [get_report(g)]
     result = '\n\n'.join(result)
     return result
 
@@ -511,6 +510,7 @@ def update_all(g):
         'duration': duration,
         'duration_text': duration_text,
         'target': target,
+        'stats': g.stats,
         'conf_dir': g.conf.conf_dir
     })
     g.text = g.conf.text_hook(ctx)
