@@ -728,8 +728,8 @@ def get_actions():
 def parse_interval(interval):
     result = None
     formats = {
-        '%d': lambda t: '{:2d}%m%Y'.format(t.tm_mday),
-        '%d%m': lambda t: '{:2d}{:2d}%Y'.format(t.tm_mday, t.tm_mon),
+        '%d': lambda t: '{:02d}%m%Y'.format(t.tm_mday),
+        '%d%m': lambda t: '{:02d}{:02d}%Y'.format(t.tm_mday, t.tm_mon),
         '%d%m%Y': None
     }
     for fmt, fix in formats.items():
