@@ -34,7 +34,7 @@ def text_hook(ctx):
             ctx.target + ('' if ctx.active else ctx.conf.break_symbol)
         )
 
-    text = '[{} {}]'.format ('☭' if ctx.active else '☯', label)
+    text = '[{} {}]'.format('☭' if ctx.active else '☯', label)
     color = '#007700' if ctx.active else '#777777'
     markup = '<span color="{}" font="11">{}</span>'.format(color, text)
     return markup
