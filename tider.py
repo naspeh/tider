@@ -19,6 +19,7 @@ from gi.repository import Gdk, Gtk, GObject
 
 GObject.threads_init()
 
+OK = 'OK'
 RELOAD = 100
 SQL_DATE = '%Y-%m-%d'
 DEFAULT_CONFIG = '''
@@ -60,7 +61,7 @@ config = dict(
 class Gui:
     def __init__(self, conf, state):
         if os.path.exists(conf.socket):
-            if send_action(conf.socket, 'ping') == 'ok':
+            if send_action(conf.socket, 'ping') == OK:
                 print('Another `tider` instance already run.')
                 raise SystemExit(1)
             else:
@@ -115,7 +116,7 @@ class Gui:
                 action = data.decode()
                 action = getattr(self, 'pub_' + action)
                 GObject.idle_add(action)
-                conn.send('ok'.encode())
+                conn.send(OK.encode())
         conn.close()
 
     def create_tray(self, menu):
@@ -711,13 +712,13 @@ def send_action(address, action):
     try:
         s.connect(address)
     except socket.error:
-        return None
+        return 'Error. No answer'
     s.send(action.encode())
     data = s.recv(1024)
     s.close()
     if data:
         return data.decode()
-    return True
+    return 'Error. Empty answer'
 
 
 def get_actions():
@@ -726,10 +727,17 @@ def get_actions():
 
 def parse_interval(interval):
     result = None
-    for prefix in ['', '%m%Y', '%Y']:
+    formats = {
+        '%d': lambda t: '{:2d}%m%Y'.format(t.tm_mday),
+        '%d%m': lambda t: '{:2d}{:2d}%Y'.format(t.tm_mday, t.tm_mon),
+        '%d%m%Y': None
+    }
+    for fmt, fix in formats.items():
         try:
-            value = [time.strftime(i + prefix) for i in interval.split('-', 1)]
-            result = [time.strptime(i, '%d%m%Y') for i in value]
+            result = [time.strptime(i, fmt) for i in interval.split('-', 1)]
+            if fix:
+                value = [time.strftime(fix(i)) if fix else i for i in result]
+                result = [time.strptime(i, '%d%m%Y') for i in value]
             break
         except ValueError:
             pass
