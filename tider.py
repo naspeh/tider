@@ -27,12 +27,15 @@ def win_hook(win):
 
 
 def text_hook(ctx):
-    text = '[{symbol} {duration} {target}]'.format(
-        symbol='☭' if ctx.is_active else '☯',
-        duration=ctx.duration_text if ctx.is_start else 'Tider',
-        target=ctx.target
-    )
-    color = '#007700' if ctx.is_active else '#777777'
+    label = 'Tider OFF'
+    if ctx.duration:
+        label = '{} {}'.format(
+            '{}:{:02d}'.format(ctx.duration.h, ctx.duration.m),
+            ctx.target + ('' if ctx.active else ctx.conf.break_symbol)
+        )
+
+    text = '[{} {}]'.format ('☭' if ctx.active else '☯', label)
+    color = '#007700' if ctx.active else '#777777'
     markup = '<span color="{}" font="11">{}</span>'.format(color, text)
     return markup
 
@@ -118,7 +121,7 @@ class Gui:
     def create_tray(self, menu):
         tray = Gtk.StatusIcon()
 
-        tray.connect('activate', lambda w: self.change_target())
+        tray.connect('activate', lambda w: self.pub_target())
         tray.connect('popup-menu', lambda icon, button, time: (
             menu.popup(None, None, icon.position_menu, icon, button, time)
         ))
@@ -173,12 +176,12 @@ class Gui:
 
         target = Gtk.ImageMenuItem.new_from_stock(Gtk.STOCK_OK, None)
         target.set_label('Set activity')
-        target.connect('activate', lambda w: self.change_target())
+        target.connect('activate', lambda w: self.pub_target())
         target.show()
 
         stat = Gtk.ImageMenuItem.new_from_stock(Gtk.STOCK_PAGE_SETUP, None)
         stat.set_label('Show statistics')
-        stat.connect('activate', lambda w: self.show_report())
+        stat.connect('activate', lambda w: self.pub_report())
         stat.show()
 
         separator = Gtk.SeparatorMenuItem()
@@ -219,7 +222,7 @@ class Gui:
         menu.popup_default = popup_default
         return menu
 
-    def show_report(self):
+    def pub_report(self):
         dialog = Gtk.MessageDialog()
         dialog.add_button(Gtk.STOCK_OK, Gtk.ResponseType.OK)
         dialog.set_markup(self.state.stats)
@@ -258,7 +261,7 @@ class Gui:
         completion.set_inline_selection(True)
         return completion
 
-    def change_target(self):
+    def pub_target(self):
         dialog = Gtk.Dialog('Set activity')
         box = dialog.get_content_area()
         press_enter = lambda w, e: (
@@ -316,17 +319,13 @@ class Gui:
             elif fix.get_active():
                 self.state.set_activity(active, target=target, new=False)
             elif reject.get_active():
-                self.state.update(start=None)
-                self.state.disable()
+                self.state.reset()
             elif off.get_active():
                 self.state.disable()
             else:
                 raise ValueError('wrong state')
 
         dialog.destroy()
-
-    def pub_target(self):
-        self.change_target()
 
     def pub_toggle_active(self):
         if self.state.start:
@@ -336,10 +335,7 @@ class Gui:
         self.menu.popup_default()
 
     def pub_disable(self):
-        self.state.disabel()
-
-    def pub_report(self):
-        self.show_report()
+        self.state.disable()
 
     def pub_quit(self):
         os.remove(self.conf.socket)
@@ -354,53 +350,46 @@ class Gui:
 
 
 class State:
+    __slots__ = '_path _data _last_overwork conf text stats'.split()
+
     def __init__(self, conf):
         self._path = os.path.join(conf.conf_dir, 'last.txt')
+        self._data = {
+            'target': None,
+            'active': False,
+            'start': None,
+            'last': None
+        }
+        self._last_overwork = None
         self.conf = conf
-        self.target = None
-        self.active = False
-        self.start = None
-        self.last = None
         self.text = None
         self.stats = None
-        self.last_overwork = None
 
         self.load()
 
-        server = Thread(target=self.update_with_timeout)
+        server = Thread(target=self.run_refreshing)
         server.daemon = True
         server.start()
 
-    def update_with_timeout(self):
+    def __getattr__(self, name):
+        return self._data[name]
+
+    def run_refreshing(self):
         while True:
-            self.update_all()
+            self.refresh()
             time.sleep(1)
 
-    def reset(self):
-        self.update(start=None, last=None, active=False)
-
     def update(self, **kwargs):
-        for k, v in kwargs.items():
-            setattr(self, k, v)
-        self.save()
-
-    def save(self):
-        with tmp_file(self._path, mode='wb') as f:
-            f.write(pickle.dumps({
-                'target': self.target,
-                'active': self.active,
-                'start': self.start,
-                'last': self.last,
-            }))
+        self._data.update(**kwargs)
+        with open(self._path, mode='wb') as f:
+            f.write(pickle.dumps(self._data))
 
     def load(self):
         state = {}
         if os.path.exists(self._path):
             with open(self._path, 'rb') as f:
                 state = pickle.load(f)
-
-        for k, v in state.items():
-            setattr(self, k, v)
+                self._data.update(**state)
 
     def set_activity(self, active, target=None, new=True):
         if not target:
@@ -414,12 +403,15 @@ class State:
             self.update(start=time.time(), last=None)
 
         self.update(target=target, active=active)
-        self.update_all()
+        self.refresh()
+
+    def reset(self):
+        self.update(start=None, last=None, active=False)
+        self.refresh()
 
     def disable(self):
         self.save_log()
         self.reset()
-        self.update_all()
 
     def save_log(self):
         if not self.start:
@@ -444,51 +436,34 @@ class State:
             )
             db.commit()
 
-    def update_all(self):
+    def refresh(self):
         if self.last and time.time() - self.last > self.conf.offline_timeout:
             return self.disable()
-        else:
-            self.update(last=time.time())
-        self.update(stats=self.get_stats())
 
-        if not self.start:
-            duration = 0
-            duration_text = ''
-            target = 'OFF'
-        else:
-            target = self.target + (
-                '' if self.active else self.conf.break_symbol
-            )
-            duration = split_seconds(int(self.last - self.start))
-            duration_text = '{}:{:02d}'.format(duration.h, duration.m)
+        self.update(last=time.time())
 
-        ctx = {
-            'is_active': self.active,
-            'is_start': bool(self.start),
-            'duration': duration,
-            'duration_text': duration_text,
-            'target': target,
-            'stats': self.stats,
-            'conf_dir': self.conf.conf_dir
-        }
+        self.stats = self.get_stats()
+
+        dur = split_seconds(int(self.last - self.start)) if self.start else 0
+        ctx = dict(self._data, conf=self.conf, stats=self.stats, duration=dur)
         ctx = namedtuple('Ctx', ctx.keys())(**ctx)
-        self.update(text=self.conf.text_hook(ctx))
+        self.text = self.conf.text_hook(ctx)
 
         if self.conf.overwork_period and self.active:
             last_working = self.get_last_working()
             if not last_working.need_break:
-                self.last_overwork = None
+                self._last_overwork = None
             else:
                 overtime = int(last_working.period - self.conf.work_period)
 
                 timeout = 0
-                if self.last_overwork:
-                    timeout = time.time() - self.last_overwork
+                if self._last_overwork:
+                    timeout = time.time() - self._last_overwork
 
                 if timeout and timeout <= self.conf.overwork_period:
                     return
 
-                self.last_overwork = time.time()
+                self._last_overwork = time.time()
 
                 f_seconds = lambda v: '<b>%s</b>' % str_seconds(v)
                 message = 'Working: ' + f_seconds(last_working.period)
