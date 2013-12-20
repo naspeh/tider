@@ -12,7 +12,6 @@ import sys
 import time
 from collections import namedtuple
 from contextlib import contextmanager
-from importlib.machinery import SourceFileLoader
 from threading import Thread
 
 from gi.repository import Gdk, Gtk, GObject
@@ -23,10 +22,24 @@ OK = 'OK'
 RELOAD = 100
 SQL_DATE = '%Y-%m-%d'
 DEFAULT_CONFIG = '''
+update_period=500  # in microseconds
+offline_timeout=300  # in seconds
+min_duration=60  # in seconds
+break_symbol='*'
+break_period=600  # in seconds
+work_period=3000  # in seconds
+overwork_period=300  # in seconds
+hide_tray=True
+hide_win=False
+sqlite_manager='sqlite3'
+
+
+# Update window after creation
 def win_hook(win):
     win.move(500, 2)
 
 
+# Update window text
 def text_hook(ctx):
     label = 'Tider OFF'
     if ctx.duration:
@@ -39,22 +52,6 @@ def text_hook(ctx):
     color = '#007700' if ctx.active else '#777777'
     markup = '<span color="{}" font="11">{}</span>'.format(color, text)
     return markup
-
-
-config = dict(
-    update_period=500,  # in microseconds
-    offline_timeout=300,  # in seconds
-    min_duration=60,  # in seconds
-    break_symbol='*',
-    break_period=600,  # in seconds
-    work_period=3000,  # in seconds
-    overwork_period=300,  # in seconds
-    hide_tray=True,
-    hide_win=False,
-    sqlite_manager='sqlite3',
-    win_hook=win_hook,  # update window after creation
-    text_hook=text_hook  # update window text
-)
 '''.strip()
 
 
@@ -573,18 +570,17 @@ def get_config():
         os.mkdir(conf_dir)
 
     conf_path = os.path.join(conf_dir, 'config.py')
-    if not os.path.exists(conf_path):
-        with open(conf_path, 'wb') as f:
-            f.write(DEFAULT_CONFIG.encode())
-
-    loader = SourceFileLoader('config', conf_path)
-    conf = loader.load_module('config')
-    conf = conf.config
-    conf['conf_dir'] = conf_dir
+    conf = {}
+    exec(DEFAULT_CONFIG, None, conf)
+    if os.path.exists(conf_path):
+        with open(conf_path, 'rb') as f:
+            source = f.read()
+        exec(source, None, conf)
 
     sid = '='.join([conf_dir, os.environ.get('XDG_SESSION_ID')])
     sid = hashlib.md5(sid.encode()).hexdigest()
     conf['socket'] = '/tmp/perevod-%s' % sid
+    conf['conf_dir'] = conf_dir
     conf['db_path'] = os.path.join(conf_dir, 'log.db')
     conf['db'] = lambda: connect_db(conf['db_path'])
     return namedtuple('Conf', conf.keys())(**conf)
