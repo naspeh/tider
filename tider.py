@@ -441,10 +441,19 @@ class State:
 
         self.update(last=time.time())
 
+        # Fill `stats` and `text` fields
         self.stats = self.get_stats()
 
-        dur = split_seconds(int(self.last - self.start)) if self.start else 0
-        ctx = dict(self._data, conf=self.conf, stats=self.stats, duration=dur)
+        ctx = dict(self._data, **{
+            'duration': None,
+            'stats': self.stats,
+
+            # useful stuff
+            'conf': self.conf,
+            'open': open_via_tmpfile
+        })
+        if self.start:
+            ctx['duration'] = split_seconds(int(self.last - self.start))
         ctx = namedtuple('Ctx', ctx.keys())(**ctx)
         self.text = self.conf.text_hook(ctx)
 
@@ -469,16 +478,12 @@ class State:
                 if overtime:
                     message += '\nOverworking: ' + f_seconds(overtime)
 
-                urgent = ''
-                if overtime > self.conf.work_period:
-                    urgent = '-u critical'
-
-                sp.call(
-                    'notify-send -t %s %s "Take a break!" "%s"' % (
-                        int(self.conf.overwork_period * 500), urgent, message
-                    ),
-                    shell=True
+                cmd = 'notify-send -t %s %s "Take a break!" "%s"' % (
+                    int(self.conf.overwork_period * 500),
+                    '-u critical' if overtime > self.conf.work_period else '',
+                    message
                 )
+                sp.call(cmd, shell=True)
 
     def get_stats(self):
         if not self.start:
@@ -625,7 +630,7 @@ def connect_db(db_path):
 
 
 @contextmanager
-def tmp_file(filename, suffix='.tmp', mode=None):
+def open_via_tmpfile(filename, suffix='.tmp', mode=None):
     '''Manipulate the tmp file and then quickly rename to `filename`'''
     tmp = filename + suffix
     if mode:
