@@ -22,16 +22,16 @@ OK = 'OK'
 RELOAD = 100
 SQL_DATE = '%Y-%m-%d'
 DEFAULT_CONFIG = '''
-update_period=500  # in microseconds
-offline_timeout=300  # in seconds
-min_duration=60  # in seconds
-break_symbol='*'
-break_period=600  # in seconds
-work_period=3000  # in seconds
-overwork_period=300  # in seconds
-hide_tray=True
-hide_win=False
-sqlite_manager='sqlite3'
+update_period = 500  # in microseconds
+offline_timeout = 300  # in seconds
+min_duration = 60  # in seconds
+break_symbol = '*'
+break_period = 600  # in seconds
+work_period = 3000  # in seconds
+overwork_period = 300  # in seconds
+hide_tray = True
+hide_win = False
+sqlite_manager = 'sqlite3'
 
 
 # Update window after creation
