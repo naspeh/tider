@@ -441,7 +441,7 @@ class State:
 
         self.update(last=time.time())
 
-        # Fill `stats` and `text` fields
+        ### Fill `stats` and `text` fields
         self.stats = self.get_stats()
 
         ctx = dict(self._data, **{
@@ -457,6 +457,7 @@ class State:
         ctx = namedtuple('Ctx', ctx.keys())(**ctx)
         self.text = self.conf.text_hook(ctx)
 
+        ### Handle overwork
         if self.conf.overwork_period and self.active:
             last_working = self.get_last_working()
             if not last_working.need_break:
