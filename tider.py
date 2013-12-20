@@ -45,7 +45,7 @@ def text_hook(ctx):
     if ctx.duration:
         label = '{} {}'.format(
             '{}:{:02d}'.format(ctx.duration.h, ctx.duration.m),
-            ctx.target + ('' if ctx.active else ctx.conf.break_symbol)
+            ctx.target + ('' if ctx.active else break_symbol)
         )
 
     text = '[{} {}]'.format('☭' if ctx.active else '☯', label)
