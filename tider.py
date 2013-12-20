@@ -45,7 +45,7 @@ def text_hook(ctx):
     if ctx.duration:
         label = '{} {}'.format(
             '{}:{:02d}'.format(ctx.duration.h, ctx.duration.m),
-            ctx.target + ('' if ctx.active else break_symbol)
+            ctx.target + ('' if ctx.active else ctx.conf.break_symbol)
         )
 
     text = '[{} {}]'.format('☭' if ctx.active else '☯', label)
@@ -56,7 +56,7 @@ def text_hook(ctx):
 
 
 class Gui:
-    def __init__(self, conf, state):
+    def __init__(self, conf):
         if os.path.exists(conf.socket):
             if send_action(conf.socket, 'ping') == OK:
                 print('Another `tider` instance already run.')
@@ -66,13 +66,14 @@ class Gui:
 
         self.reload = False
         self.conf = conf
-        self.state = state
+        self.state = State(conf)
 
         self.menu = menu = self.create_menu()
         win = self.create_win(menu) if not conf.hide_win else None
         tray = self.create_tray(menu) if not conf.hide_tray else None
 
         def update():
+            self.state.refresh()
             menu.update()
             if win:
                 win.update()
@@ -365,17 +366,8 @@ class State:
 
         self.load()
 
-        server = Thread(target=self.run_refreshing)
-        server.daemon = True
-        server.start()
-
     def __getattr__(self, name):
         return self._data[name]
-
-    def run_refreshing(self):
-        while True:
-            self.refresh()
-            time.sleep(1)
 
     def update(self, **kwargs):
         self.load()
@@ -783,8 +775,7 @@ def process_args(args):
 
     args = parser.parse_args(args)
     if not hasattr(args, 'cmd'):
-        state = State(conf)
-        Gui(conf, state)
+        Gui(conf)
 
     elif hasattr(args, 'exe'):
         args.exe(args)
