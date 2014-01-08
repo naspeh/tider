@@ -1,4 +1,4 @@
-Time tracker (lightweight GTK+)
+Lightweight time tracker (GTK+)
 -------------------------------
 **In development.**
 

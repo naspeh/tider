@@ -8,7 +8,7 @@ if sys.version_info <= (3, 2):
 
 setup(
     name='tider',
-    description='Time tracker with labels and history (lightweight GTK+)',
+    description='Lightweight time tracker with labels and history (GTK+)',
     license='BSD',
     version='beta',
     author='naspeh',

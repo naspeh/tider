@@ -3,7 +3,7 @@
 pkgname=tider-git
 pkgver=0.0.0
 pkgrel=7
-pkgdesc='Time tracker with labels and history (lightweight GTK+)'
+pkgdesc='Lightweight time tracker with labels and history (GTK+)'
 arch=('any')
 url='https://github.com/naspeh/tider'
 license=('BSD')
