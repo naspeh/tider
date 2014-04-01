@@ -2,10 +2,10 @@
 
 pkgname=tider-git
 pkgver=0.0.0
-pkgrel=7
-pkgdesc='Lightweight time tracker with labels and history (GTK+)'
+pkgrel=8
+pkgdesc='Lightweight time tracker (GTK+)'
 arch=('any')
-url='https://github.com/naspeh/tider'
+url='http://pusto.org/en/tider/'
 license=('BSD')
 depends=('python-gobject' 'gtk3' 'libnotify')
 makedepends=('git')
