@@ -84,7 +84,7 @@ class Gui:
         update()
         GObject.timeout_add(conf.update_period, update)
 
-        ### Start GTK loop
+        # Start GTK loop
         server = Thread(target=self.serve, args=(conf.socket,))
         server.daemon = True
         server.start()
@@ -261,7 +261,7 @@ class Gui:
         return completion
 
     def pub_target(self):
-        dialog = Gtk.Dialog('Set activity')
+        dialog = Gtk.Dialog()
         box = dialog.get_content_area()
         press_enter = lambda w, e: (
             e.keyval == Gdk.KEY_Return and dialog.response(Gtk.ResponseType.OK)
@@ -433,7 +433,7 @@ class State:
 
         self.update(last=time.time())
 
-        ### Fill `stats` and `text` fields
+        # Fill `stats` and `text` fields
         self.stats = self.get_stats()
 
         ctx = dict(self._data, **{
@@ -449,7 +449,7 @@ class State:
         ctx = namedtuple('Ctx', ctx.keys())(**ctx)
         self.text = self.conf.text_hook(ctx)
 
-        ### Handle overwork
+        # Handle overwork
         if self.conf.overwork_period and self.active:
             last_working = self.get_last_working()
             if not last_working.need_break:
@@ -541,7 +541,7 @@ class State:
             period, need_break = rows[0][2], False
             started, ended = rows[0][0], rows[0][1]
             for i in range(1, len(rows)):
-                if rows[i-1][0] - rows[i][1] > self.conf.break_period:
+                if rows[i - 1][0] - rows[i][1] > self.conf.break_period:
                     break
                 period += rows[i][2]
                 started = rows[i][0]
