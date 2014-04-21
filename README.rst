@@ -8,12 +8,10 @@ Installation
 ------------
 Code available on `github <https://github.com/naspeh/tider>`_
 
-Tider requires ``Python>=3.3`` and ``GTK3``, optional ``notify-send`` for notifications.
+Requires ``Python>=3.3`` and ``GTK3``, optional ``notify-send`` for notifications.::
 
-::
+    $ pip install https://github.com/naspeh/tider/archive/master.zip
 
-    $ pip install -e git+git@github.com:naspeh/tider.git#egg=tider
-
-**Installation on Archlinux**::
+**Arch Linux**::
 
     $ yaourt -S tider-git
