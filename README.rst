@@ -8,7 +8,9 @@ Installation
 ------------
 Code available on `github <https://github.com/naspeh/tider>`_
 
-Requires ``Python>=3.3`` and ``GTK3``, optional ``notify-send`` for notifications.::
+Requires ``Python>=3.3`` and ``GTK3``, optional ``notify-send`` for notifications.
+
+::
 
     $ pip install https://github.com/naspeh/tider/archive/master.zip
 
