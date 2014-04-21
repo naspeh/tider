@@ -2,7 +2,7 @@
 time on which activities while I am working on computer. And it also remind me to take a 
 break.
 
-More infomation: http://pusto.org/en/tider/.
+**More infomation:** http://pusto.org/en/tider/
 
 Installation
 ------------
