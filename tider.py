@@ -1,4 +1,5 @@
 import argparse
+import datetime as dt
 import hashlib
 import math
 import os
@@ -720,7 +721,23 @@ def get_actions():
 
 
 def parse_interval(interval):
-    result = None
+    def get_named(name):
+        name = name.lower()
+        now = dt.datetime.now()
+        if name in ('w', 'week'):
+            start = now - dt.timedelta(days=now.weekday())
+        elif name in ('m', 'month'):
+            start = now.replace(day=1)
+        elif name in ('y', 'year'):
+            start = now.replace(day=1, month=1)
+        else:
+            return
+        return [i.timetuple() for i in (start, now)]
+
+    result = get_named(interval)
+    if result:
+        return result
+
     formats = {
         '%d': lambda t: '{:02d}%m%Y'.format(t.tm_mday),
         '%d%m': lambda t: '{:02d}{:02d}%Y'.format(t.tm_mday, t.tm_mon),
@@ -760,7 +777,10 @@ def process_args(args):
         .exe(lambda a: print(send_action(conf.socket, a.name)))
 
     cmd('report', aliases=['re'], help='print report')\
-        .arg('-i', '--interval', help='DD, DDMM, DDMMYYYY or pair via "-"')\
+        .arg('-i', '--interval', help=(
+            'date in format DD, DDMM, DDMMYYYY or pair via "-" '
+            'or name w[eek], m[onth], y[ear]'
+        ))\
         .arg('-d', '--daily', action='store_true', help='daily report')\
         .arg('-w', '--weekly', action='store_true', help='weekly report')\
         .arg('-m', '--monthly', action='store_true', help='monthly report')\
