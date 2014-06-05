@@ -722,16 +722,26 @@ def get_actions():
 
 def parse_interval(interval):
     def get_named(name):
-        name = name.lower()
+        named = re.match(r'(\d*)(w|week|m|month|y|year)', name.lower())
+        if not named:
+            return
+
+        count = int(named.group(1) or 1) - 1
+        name = named.group(2)
+
         now = dt.datetime.now()
         if name in ('w', 'week'):
             start = now - dt.timedelta(days=now.weekday())
+            if count:
+                start -= dt.timedelta(days=count * 6)
         elif name in ('m', 'month'):
             start = now.replace(day=1)
+            for i in range(count):
+                start = (start - dt.timedelta(days=1)).replace(day=1)
         elif name in ('y', 'year'):
             start = now.replace(day=1, month=1)
-        else:
-            return
+            for i in range(count):
+                start = (start - dt.timedelta(days=1)).replace(day=1, month=1)
         return [i.timetuple() for i in (start, now)]
 
     result = get_named(interval)
