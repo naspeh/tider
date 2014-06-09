@@ -373,14 +373,17 @@ class State:
     def update(self, **kwargs):
         self.load()
         self._data.update(**kwargs)
-        with open(self._path, mode='wb') as f:
+        with open_via_tmpfile(self._path, mode='wb') as f:
             f.write(pickle.dumps(self._data))
 
     def load(self):
         state = {}
         if os.path.exists(self._path):
             with open(self._path, 'rb') as f:
-                state = pickle.load(f)
+                try:
+                    state = pickle.load(f)
+                except pickle.UnpicklingError:
+                    state = {}
                 self._data.update(**state)
 
     def set_activity(self, active, target=None, new=True):
