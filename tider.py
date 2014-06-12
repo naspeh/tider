@@ -382,7 +382,7 @@ class State:
             with open(self._path, 'rb') as f:
                 try:
                     state = pickle.load(f)
-                except pickle.UnpicklingError:
+                except Exception:
                     state = {}
                 self._data.update(**state)
 
