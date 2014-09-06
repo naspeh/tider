@@ -685,9 +685,11 @@ def get_report(conf, interval=None, like=None, label=None):
         result += ['  {}: {}'.format(row[0], str_seconds(row[1]))]
     elif len(rows) > 1:
         total = sum(v[1] for v in rows)
+        total_rest = math.ceil(total / 5)
         rows += [
-            ('total', total),
-            (' + rest', math.ceil(total * (1 + 1 / 6)))
+            ('work', total),
+            ('rest', total_rest),
+            ('total', total + total_rest),
         ]
 
         header = ('target', 'duration')
@@ -702,7 +704,7 @@ def get_report(conf, interval=None, like=None, label=None):
             details += [pattern.format(
                 target, str_seconds(work_time)
             )]
-        details.insert(-2, sep)
+        details.insert(-3, sep)
         result += ['<tt>{}</tt>'.format('\n'.join(details))]
 
     result = '\n'.join(result)
