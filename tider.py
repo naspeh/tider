@@ -42,12 +42,8 @@ def win_hook(win):
 
 # Update window text
 def text_hook(ctx):
-    label = 'Tider OFF'
-    if ctx.duration:
-        label = '{} {}'.format(
-            '{}:{:02d}'.format(ctx.duration.h, ctx.duration.m),
-            ctx.target + ('' if ctx.active else ctx.conf.break_symbol)
-        )
+    target = ctx.target if ctx.active else 'OFF'
+    label = '{0.duration.h}:{0.duration.m:02d} {1}'.format(ctx, target)
 
     text = '[{} {}]'.format('☭' if ctx.active else '☯', label)
     color = '#007700' if ctx.active else '#777777'
@@ -440,23 +436,27 @@ class State:
         # Fill `stats` and `text` fields
         self.stats = self.get_stats()
 
+        last_working = self.get_last_working()
+        if self.start:
+            duration = self.last - self.start
+        elif last_working.ended:
+            duration = time.time() - last_working.ended
+        else:
+            duration = 0
         ctx = dict(self._data, **{
-            'duration': None,
+            'duration': split_seconds(duration),
             'stats': self.stats,
-            'last_working': self.get_last_working(),
+            'active': self.active,
 
             # useful stuff
             'conf': self.conf,
-            'open': open_via_tmpfile
+            'open': open_via_tmpfile,
         })
-        if self.start:
-            ctx['duration'] = split_seconds(int(self.last - self.start))
         ctx = namedtuple('Ctx', ctx.keys())(**ctx)
         self.text = self.conf.text_hook(ctx)
 
         # Handle overwork
         if self.conf.overwork_period and self.active:
-            last_working = self.get_last_working()
             if not last_working.need_break:
                 self._last_overwork = None
             else:
