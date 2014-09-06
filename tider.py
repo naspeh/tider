@@ -725,7 +725,7 @@ def get_actions():
 
 def parse_interval(interval):
     def get_named(name):
-        named = re.match(r'(\d*)(w|week|m|month|y|year)', name.lower())
+        named = re.match(r'^(\d*)(w|week|m|month|y|year)$', name.lower())
         if not named:
             return
 
@@ -736,7 +736,7 @@ def parse_interval(interval):
         if name in ('w', 'week'):
             start = now - dt.timedelta(days=now.weekday())
             if count:
-                start -= dt.timedelta(days=count * 6)
+                start -= dt.timedelta(days=count * 7)
         elif name in ('m', 'month'):
             start = now.replace(day=1)
             for i in range(count):
@@ -775,7 +775,7 @@ def parse_interval(interval):
 
 def process_args(args):
     conf = get_config()
-    parser = argparse.ArgumentParser()
+    parser = argparse.ArgumentParser(prog='tider')
     cmds = parser.add_subparsers(title='commands')
 
     def cmd(name, **kw):
