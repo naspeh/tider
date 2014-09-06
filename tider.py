@@ -443,6 +443,7 @@ class State:
         ctx = dict(self._data, **{
             'duration': None,
             'stats': self.stats,
+            'last_working': self.get_last_working(),
 
             # useful stuff
             'conf': self.conf,
@@ -492,7 +493,7 @@ class State:
                 .format(
                     state='working' if self.active else 'break',
                     target=self.target,
-                    started=time.strftime('%H:%M', time.localtime(self.start)),
+                    started=str_time(self.start),
                     duration=str_seconds(time.time() - self.start)
                 )
             )
@@ -506,13 +507,9 @@ class State:
                 .format(period=str_seconds(last_w.period))
             )
             if self.active:
-                last_working += ' from {}'.format(
-                    time.strftime('%H:%M', time.localtime(last_w.started))
-                )
+                last_working += ' from {}'.format(last_w.started_str)
             else:
-                last_working += ' till {}'.format(
-                    time.strftime('%H:%M', time.localtime(last_w.ended))
-                )
+                last_working += ' till {}'.format(last_w.ended_str)
             if self.active and last_w.need_break:
                 last_working += '\n  <b>Need a break!</b>'
             elif not self.active and not last_w.need_break:
@@ -554,7 +551,8 @@ class State:
                 need_break = period > self.conf.work_period
         last = {
             'period': period, 'need_break': need_break,
-            'started': started, 'ended': ended
+            'started': started, 'started_str': str_time(started),
+            'ended': ended, 'ended_str': str_time(ended)
         }
         return namedtuple('Last', last.keys())(**last)
 
@@ -649,6 +647,10 @@ def str_seconds(duration):
     result += '{}m '.format(time.m) if time.h or time.m else ''
     result += '{}s'.format(time.s)
     return result
+
+
+def str_time(v):
+    return time.strftime('%H:%M', time.localtime(v))
 
 
 def get_report(conf, interval=None, like=None, label=None):
