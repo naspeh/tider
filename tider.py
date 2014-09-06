@@ -662,7 +662,7 @@ def get_report(conf, interval=None, like=None, label=None):
 
     db, cursor = conf.db()
     cursor.execute(
-        'SELECT target, SUM(work), SUM(break) FROM log'
+        'SELECT target, SUM(work) FROM log'
         '   WHERE date(start, "unixepoch", "localtime") BETWEEN ? AND ?' +
         ('  AND target like ?' if like else '') +
         '   GROUP BY target'
@@ -682,23 +682,27 @@ def get_report(conf, interval=None, like=None, label=None):
         result += ['  No activities']
     elif len(rows) == 1:
         row = rows[0]
-        line = '  {}: {}'.format(row[0], str_seconds(row[1]))
-        if row[2]:
-            line += ' (and breaks {})'.format(str_seconds(row[2]))
-        result += [line]
+        result += ['  {}: {}'.format(row[0], str_seconds(row[1]))]
     elif len(rows) > 1:
-        details = []
-        total = lambda index: str_seconds(sum(v[index] for v in rows))
-        header = ('target', 'work', 'break')
+        total = sum(v[1] for v in rows)
+        rows += [
+            ('total', total),
+            (' + rest', math.ceil(total * (1 + 1 / 6)))
+        ]
+
+        header = ('target', 'duration')
         width = max([len(header[0])] + [len(r[0]) for r in rows])
-        pattern = '|{:<%s}|{:>11}|{:>11}|' % width
-        separator = '|%s|' % '+'.join(['-' * width] + ['-' * 11] * 2)
-        details += [pattern.format(*header), separator]
-        for target, work_time, break_time in rows:
+
+        pattern = '|{:<%s}%%s{:>11}|' % width
+        sep = (pattern % '+').format('-' * width, '-' * 11)
+        pattern = pattern % '|'
+
+        details = [pattern.format(*header), sep]
+        for target, work_time in rows:
             details += [pattern.format(
-                target, str_seconds(work_time), str_seconds(break_time)
+                target, str_seconds(work_time)
             )]
-        details += [separator, pattern.format('total', total(1), total(2))]
+        details.insert(-2, sep)
         result += ['<tt>{}</tt>'.format('\n'.join(details))]
 
     result = '\n'.join(result)
@@ -792,7 +796,7 @@ def process_args(args):
     cmd('report', aliases=['re'], help='print report')\
         .arg('-i', '--interval', help=(
             'date in format DD, DDMM, DDMMYYYY or pair via "-" '
-            'or name w[eek], m[onth], y[ear]'
+            'or /(\d*)(w|week|m|month|y|year)/'
         ))\
         .arg('-d', '--daily', action='store_true', help='daily report')\
         .arg('-w', '--weekly', action='store_true', help='weekly report')\
