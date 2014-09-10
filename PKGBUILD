@@ -2,7 +2,7 @@
 
 pkgname=tider-git
 pkgver=0.0.0
-pkgrel=8
+pkgrel=9
 pkgdesc='Lightweight time tracker (GTK+)'
 arch=('any')
 url='http://pusto.org/en/tider/'
