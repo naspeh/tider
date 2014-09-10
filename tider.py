@@ -680,33 +680,32 @@ def get_report(conf, interval=None, like=None, label=None):
     else:
         result = ['<b>Statistics from {} to {}</b>'.format(*interval)]
 
+    get_rest = lambda v: '~%s' % str_seconds(v + math.ceil(v / 5))
+    get_work_n_rest = lambda v: (
+        '{} (with rest {})'.format(str_seconds(v), get_rest(v))
+    )
     if not rows:
         result += ['  No activities']
     elif len(rows) == 1:
         row = rows[0]
-        result += ['  {}: {}'.format(row[0], str_seconds(row[1]))]
+        result += ['  {}: {}'.format(row[0], get_work_n_rest(row[1]))]
     elif len(rows) > 1:
         total = sum(v[1] for v in rows)
-        total_rest = math.ceil(total / 5)
-        rows += [
-            ('work', total),
-            ('rest', total_rest),
-            ('total', total + total_rest),
-        ]
+        rows += [('total', total)]
 
-        header = ('target', 'duration')
+        header = ('target', 'work', 'with rest')
         width = max([len(header[0])] + [len(r[0]) for r in rows])
 
-        pattern = '|{:<%s}%%s{:>11}|' % width
-        sep = (pattern % '+').format('-' * width, '-' * 11)
+        pattern = '|{:<%s}%%s{:>11}|{:>11}|' % width
+        sep = (pattern % '+').format('-' * width, *(['-' * 11] * 2))
         pattern = pattern % '|'
 
         details = [pattern.format(*header), sep]
         for target, work_time in rows:
             details += [pattern.format(
-                target, str_seconds(work_time)
+                target, str_seconds(work_time), get_rest(work_time)
             )]
-        details.insert(-3, sep)
+        details.insert(-1, sep)
         result += ['<tt>{}</tt>'.format('\n'.join(details))]
 
     result = '\n'.join(result)
