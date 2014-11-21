@@ -5,7 +5,6 @@ import math
 import os
 import pickle
 import re
-import signal
 import socket
 import sqlite3
 import subprocess as sp
@@ -86,7 +85,6 @@ class Gui:
         server.daemon = True
         server.start()
 
-        signal.signal(signal.SIGINT, lambda s, f: self.pub_quit())
         try:
             Gtk.main()
         finally:
@@ -864,10 +862,7 @@ def tider(args=None):
     if args is None:
         args = sys.argv[1:]
 
-    try:
-        process_args(args)
-    except KeyboardInterrupt:
-        raise SystemExit()
+    process_args(args)
 
 
 if __name__ == '__main__':

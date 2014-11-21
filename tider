@@ -5,6 +5,9 @@ import subprocess
 from tider import RELOAD
 
 cmd = [sys.executable, '-m', 'tider'] + sys.argv[1:]
-code = subprocess.call(cmd)
-if code == RELOAD:
-    subprocess.call(sys.argv)
+try:
+    code = subprocess.call(cmd)
+    if code == RELOAD:
+        subprocess.call(sys.argv)
+except KeyboardInterrupt:
+    raise SystemExit()
