@@ -273,13 +273,7 @@ class Gui:
         name.set_max_length(20)
         name.set_text(self.state.target or 'Enter name...')
         name.connect('key-press-event', press_enter)
-        note = Gtk.Label(halign=Gtk.Align.END)
-        note.set_markup(
-            '<small>Use symbol <b>{} in the end</b> for a break</small>'
-            .format(self.conf.break_symbol)
-        )
         box.add(name)
-        box.pack_start(note, True, True, 3)
 
         start = Gtk.RadioButton.new_from_widget(None)
         start.set_label('start new')
