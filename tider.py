@@ -156,14 +156,6 @@ class Gui:
         return win
 
     def create_menu(self):
-        start = Gtk.ImageMenuItem.new_from_stock(Gtk.STOCK_MEDIA_PLAY, None)
-        start.set_label('Start working')
-        start.connect('activate', lambda w: self.state.set_activity(True))
-
-        stop = Gtk.ImageMenuItem.new_from_stock(Gtk.STOCK_MEDIA_PAUSE, None)
-        stop.set_label('Start break')
-        stop.connect('activate', lambda w: self.state.set_activity(False))
-
         off = Gtk.ImageMenuItem.new_from_stock(Gtk.STOCK_MEDIA_STOP, None)
         off.set_label('Switch off')
         off.connect('activate', lambda w: self.state.disable())
@@ -186,23 +178,15 @@ class Gui:
         quit.show()
 
         menu = Gtk.Menu()
-        items = [target, start, stop, off, stat, separator, quit]
+        items = [target, off, stat, separator, quit]
         for i in items:
             menu.append(i)
 
         def update():
             if not self.state.start:
                 off.hide()
-                start.hide()
-                stop.hide()
-            elif self.state.active:
-                off.show()
-                start.hide()
-                stop.show()
             else:
                 off.show()
-                stop.hide()
-                start.show()
 
         def popup_default(e=None):
             if e:
@@ -314,10 +298,6 @@ class Gui:
                 raise ValueError('wrong state')
 
         dialog.destroy()
-
-    def pub_toggle_active(self):
-        if self.state.start:
-            self.state.set_activity(not self.state.active),
 
     def pub_menu(self):
         self.menu.popup_default()
