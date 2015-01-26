@@ -625,7 +625,7 @@ def str_time(v):
     return time.strftime('%H:%M', time.localtime(v))
 
 
-def get_report(conf, interval=None, like=None, label=None):
+def get_report(conf, interval=None, like=None, label=None, one=False):
     if not interval:
         interval = [time.strftime(SQL_DATE)]
 
@@ -668,15 +668,19 @@ def get_report(conf, interval=None, like=None, label=None):
         header = ('target', 'work', 'with rest')
         width = max([len(header[0])] + [len(r[0]) for r in rows])
 
-        pattern = '|{:<%s}%%s{:>11}|{:>11}|' % width
-        sep = (pattern % '+').format('-' * width, *(['-' * 11] * 2))
-        pattern = pattern % '|'
+        if one:
+            pattern_ = '|{:<%s}|{:>11}|' % width
+            line = lambda *a: pattern_.format(a[0], a[2])
+        else:
+            pattern_ = '|{:<%s}|{:>11}|{:>11}|' % width
+            line = lambda *a: pattern_.format(*a)
+        sep = line('-' * width, *(['-' * 11] * 2))
 
-        details = [pattern.format(*header), sep]
+        details = [line(*header), sep]
         for target, work_time in rows:
-            details += [pattern.format(
-                target, str_seconds(work_time), get_rest(work_time)
-            )]
+            details += [
+                line(target, str_seconds(work_time), get_rest(work_time))
+            ]
         details.insert(-1, sep)
         result += ['<tt>{}</tt>'.format('\n'.join(details))]
 
@@ -776,7 +780,8 @@ def process_args(args):
         .arg('-d', '--daily', action='store_true', help='daily report')\
         .arg('-w', '--weekly', action='store_true', help='weekly report')\
         .arg('-m', '--monthly', action='store_true', help='monthly report')\
-        .arg('-t', '--target', help='filter targets (sqlite like syntax)')
+        .arg('-t', '--target', help='filter targets (sqlite like syntax)')\
+        .arg('-o', '--one', action='store_true', help='one column')
 
     cmd('db', help='enter to sqlite session')\
         .arg('--cmd', default=conf.sqlite_manager, help='sqlite manager')\
@@ -794,6 +799,9 @@ def process_args(args):
 
     elif args.cmd == 'report':
         interval = result = []
+        get_report_ = lambda interval, **kw: (
+            get_report(conf, interval, args.target, one=args.one)
+        )
         if args.interval:
             interval_ = parse_interval(args.interval)
             interval = [time.strftime(SQL_DATE, i) for i in interval_]
@@ -814,7 +822,7 @@ def process_args(args):
             for i in range(math.ceil((end - begin) / day) + 1):
                 cur = begin + i * day
                 if args.daily:
-                    result += [get_report(conf, [strftime(cur)], args.target)]
+                    result += [get_report_([strftime(cur)])]
                 else:
                     next_ = begin + day * (i + 1)
                     if is_firstday(next_) or cur >= end:
@@ -826,10 +834,10 @@ def process_args(args):
                                 else None
                             )
                         int_ = [strftime(begin_), strftime(cur)]
-                        result += [get_report(conf, int_, args.target, label)]
+                        result += [get_report_(int_, label=label)]
                         begin_ = next_
 
-        result += [get_report(conf, interval, args.target)]
+        result += [get_report_(interval)]
         result = '\n\n'.join(result)
         result = re.sub(r'<[^>]+>', '', result)
         print(result)
