@@ -653,9 +653,12 @@ def get_report(conf, interval=None, like=None, label=None, one=False):
         result = ['<b>Statistics from {} to {}</b>'.format(*interval)]
 
     get_rest = lambda v: '%s' % str_seconds(v + math.ceil(v / 5))
-    get_work_n_rest = lambda v: (
-        '{} (with rest ~{})'.format(str_seconds(v), get_rest(v))
-    )
+    if one:
+        get_work_n_rest = lambda v: get_rest(v)
+    else:
+        get_work_n_rest = lambda v: (
+            '{} (with rest ~{})'.format(str_seconds(v), get_rest(v))
+        )
     if not rows:
         result += ['  No activities']
     elif len(rows) == 1:
