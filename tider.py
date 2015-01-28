@@ -625,7 +625,7 @@ def str_time(v):
     return time.strftime('%H:%M', time.localtime(v))
 
 
-def get_report(conf, interval=None, like=None, label=None, one=False):
+def get_report(conf, interval=None, like=None, label=None, one=0, quiet=1):
     if not interval:
         interval = [time.strftime(SQL_DATE)]
 
@@ -645,7 +645,9 @@ def get_report(conf, interval=None, like=None, label=None, one=False):
     )
     rows = cursor.fetchall()
 
-    if label:
+    if not rows and quiet:
+        result = []
+    elif label:
         result = ['<b>Statistics {}</b>'.format(label)]
     elif interval[0] == interval[1]:
         result = ['<b>Statistics for {}</b>'.format(interval[0])]
@@ -660,7 +662,7 @@ def get_report(conf, interval=None, like=None, label=None, one=False):
             '{} (with rest ~{})'.format(str_seconds(v), get_rest(v))
         )
     if not rows:
-        result += ['  No activities']
+        result += [] if quiet else ['  No activities']
     elif len(rows) == 1:
         row = rows[0]
         result += ['  {}: {}'.format(row[0], get_work_n_rest(row[1]))]
@@ -784,7 +786,8 @@ def process_args(args):
         .arg('-w', '--weekly', action='store_true', help='weekly report')\
         .arg('-m', '--monthly', action='store_true', help='monthly report')\
         .arg('-t', '--target', help='filter targets (sqlite like syntax)')\
-        .arg('-o', '--one', action='store_true', help='one column')
+        .arg('-o', '--one', action='store_true', help='one column')\
+        .arg('-q', '--quiet', action='store_true', help='less output')
 
     cmd('db', help='enter to sqlite session')\
         .arg('--cmd', default=conf.sqlite_manager, help='sqlite manager')\
@@ -802,9 +805,9 @@ def process_args(args):
 
     elif args.cmd == 'report':
         interval = result = []
-        get_report_ = lambda interval, **kw: (
-            get_report(conf, interval, args.target, one=args.one)
-        )
+        get_report_ = lambda interval, **kw: (get_report(
+            conf, interval, args.target, one=args.one, quiet=args.quiet
+        ))
         if args.interval:
             interval_ = parse_interval(args.interval)
             interval = [time.strftime(SQL_DATE, i) for i in interval_]
@@ -841,7 +844,7 @@ def process_args(args):
                         begin_ = next_
 
         result += [get_report_(interval)]
-        result = '\n\n'.join(result)
+        result = '\n\n'.join(r for r in result if r)
         result = re.sub(r'<[^>]+>', '', result)
         print(result)
 
