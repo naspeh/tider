@@ -339,7 +339,7 @@ class State:
         return self._data[name]
 
     def update(self, **kwargs):
-        self.load()
+        # self.load()
         self._data.update(**kwargs)
         with open_via_tmpfile(self._path, mode='wb') as f:
             f.write(pickle.dumps(self._data))
@@ -600,11 +600,8 @@ def connect_db(db_path):
 def open_via_tmpfile(filename, suffix='.tmp', mode=None):
     '''Manipulate the tmp file and then quickly rename to `filename`'''
     tmp = filename + suffix
-    if mode:
-        with open(tmp, mode) as f:
-            yield f
-    else:
-        yield tmp
+    with open(tmp, mode) as f:
+        yield f
     os.rename(tmp, filename)
 
 
