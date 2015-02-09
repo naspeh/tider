@@ -69,7 +69,10 @@ class Gui:
         tray = self.create_tray(menu) if not conf.hide_tray else None
 
         def update():
-            self.state.refresh()
+            try:
+                self.state.refresh()
+            except IOError:
+                pass
             menu.update()
             if win:
                 win.update()
