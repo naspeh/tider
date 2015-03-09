@@ -22,7 +22,7 @@ OK = 'OK'
 RELOAD = 100
 SQL_DATE = '%Y-%m-%d'
 DEFAULT_CONFIG = '''
-update_period = 500  # in microseconds
+update_period = 1000  # in microseconds
 offline_timeout = 300  # in seconds
 min_duration = 60  # in seconds
 break_symbol = '*'
@@ -69,10 +69,7 @@ class Gui:
         tray = self.create_tray(menu) if not conf.hide_tray else None
 
         def update():
-            try:
-                self.state.refresh()
-            except IOError:
-                pass
+            self.state.refresh()
             menu.update()
             if win:
                 win.update()
@@ -215,7 +212,7 @@ class Gui:
             dialog.set_markup(self.state.stats)
             return True
 
-        GObject.timeout_add(self.conf.update_period, update)
+        GObject.timeout_add(1000, update)
         dialog.run()
         dialog.destroy()
 
