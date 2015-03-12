@@ -339,7 +339,7 @@ class State:
         return self._data[name]
 
     def update(self, **kwargs):
-        # self.load()
+        self.load()
         self._data.update(**kwargs)
         with open_via_tmpfile(self._path, mode='wb') as f:
             f.write(pickle.dumps(self._data))
