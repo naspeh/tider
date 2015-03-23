@@ -223,7 +223,6 @@ class Gui:
             SELECT DISTINCT target FROM log
                 GROUP BY target
                 ORDER BY start DESC
-                LIMIT 20
             '''
         )
         names = cursor.fetchall()
