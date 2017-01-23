@@ -14,6 +14,10 @@ from collections import namedtuple
 from contextlib import contextmanager
 from threading import Thread
 
+import gi
+gi.require_version('Gdk', '3.0')  # noqa
+gi.require_version('Gtk', '3.0')  # noqa
+
 from gi.repository import Gdk, Gtk, GObject
 
 GObject.threads_init()
@@ -652,7 +656,8 @@ def get_report(conf, interval=None, like=None, label=None, one=0, quiet=1):
 
     get_rest = lambda v: '%s' % str_seconds(v + math.ceil(v / 5))
     if one:
-        get_work_n_rest = lambda v: get_rest(v)
+        # get_work_n_rest = lambda v: get_rest(v)
+        get_work_n_rest = lambda v: str_seconds(v)
     else:
         get_work_n_rest = lambda v: (
             '{} (with rest ~{})'.format(str_seconds(v), get_rest(v))
