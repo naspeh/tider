@@ -625,7 +625,7 @@ def str_time(v):
     return time.strftime('%H:%M', time.localtime(v))
 
 
-def get_report(conf, interval=None, like=None, label=None, one=0, quiet=1):
+def get_report(conf, interval=None, like=None, label=None, quiet=True):
     if not interval:
         interval = [time.strftime(SQL_DATE)]
 
@@ -654,38 +654,26 @@ def get_report(conf, interval=None, like=None, label=None, one=0, quiet=1):
     else:
         result = ['<b>Statistics from {} to {}</b>'.format(*interval)]
 
-    get_rest = lambda v: '%s' % str_seconds(v + math.ceil(v / 5))
-    if one:
-        # get_work_n_rest = lambda v: get_rest(v)
-        get_work_n_rest = lambda v: str_seconds(v)
-    else:
-        get_work_n_rest = lambda v: (
-            '{} (with rest ~{})'.format(str_seconds(v), get_rest(v))
-        )
     if not rows:
         result += [] if quiet else ['  No activities']
     elif len(rows) == 1:
         row = rows[0]
-        result += ['  {}: {}'.format(row[0], get_work_n_rest(row[1]))]
+        result += ['  {}: {}'.format(row[0], str_seconds(row[1]))]
     elif len(rows) > 1:
         total = sum(v[1] for v in rows)
         rows += [('total', total)]
 
-        header = ('target', 'work', 'with rest')
+        header = ('target', 'work')
         width = max([len(header[0])] + [len(r[0]) for r in rows])
 
-        if one:
-            pattern_ = '|{:<%s}|{:>11}|' % width
-            line = lambda *a: pattern_.format(a[0], a[2])
-        else:
-            pattern_ = '|{:<%s}|{:>11}|{:>11}|' % width
-            line = lambda *a: pattern_.format(*a)
+        pattern_ = '|{:<%s}|{:>11}|' % width
+        line = lambda *a: pattern_.format(*a)
         sep = line('-' * width, *(['-' * 11] * 2))
 
         details = [line(*header), sep]
         for target, work_time in rows:
             details += [
-                line(target, str_seconds(work_time), get_rest(work_time))
+                line(target, str_seconds(work_time))
             ]
         details.insert(-1, sep)
         result += ['<tt>{}</tt>'.format('\n'.join(details))]
@@ -787,7 +775,6 @@ def process_args(args):
         .arg('-w', '--weekly', action='store_true', help='weekly report')\
         .arg('-m', '--monthly', action='store_true', help='monthly report')\
         .arg('-t', '--target', help='filter targets (sqlite like syntax)')\
-        .arg('-o', '--one', action='store_true', help='one column')\
         .arg('-q', '--quiet', action='store_true', help='less output')
 
     cmd('db', help='enter to sqlite session')\
@@ -806,8 +793,8 @@ def process_args(args):
 
     elif args.cmd == 'report':
         interval = result = []
-        get_report_ = lambda interval, **kw: (get_report(
-            conf, interval, args.target, one=args.one, quiet=args.quiet
+        report = lambda interval, **kw: (get_report(
+            conf, interval, args.target, quiet=args.quiet
         ))
         if args.interval:
             interval_ = parse_interval(args.interval)
@@ -829,7 +816,7 @@ def process_args(args):
             for i in range(math.ceil((end - begin) / day) + 1):
                 cur = begin + i * day
                 if args.daily:
-                    result += [get_report_([strftime(cur)])]
+                    result += [report([strftime(cur)])]
                 else:
                     next_ = begin + day * (i + 1)
                     if is_firstday(next_) or cur >= end:
@@ -841,10 +828,10 @@ def process_args(args):
                                 else None
                             )
                         int_ = [strftime(begin_), strftime(cur)]
-                        result += [get_report_(int_, label=label)]
+                        result += [report(int_, label=label)]
                         begin_ = next_
 
-        result += [get_report_(interval)]
+        result += [report(interval)]
         result = '\n\n'.join(r for r in result if r)
         result = re.sub(r'<[^>]+>', '', result)
         print(result)
